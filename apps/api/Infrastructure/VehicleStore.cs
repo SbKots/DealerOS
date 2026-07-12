@@ -43,6 +43,11 @@ public sealed class VehicleStore(DealerOsDbContext dbContext) : IVehicleStore, I
                 _ => "Запись конфликтует с уже существующими данными."
             });
         }
+        catch (Exception exception) when (IsPostgresConcurrencyConflict(exception))
+        {
+            throw new ConflictException("database.concurrency_conflict",
+                "Данные были одновременно изменены другим запросом. Обновите страницу.");
+        }
     }
 
     public void Write(Guid organizationId, Guid actorUserId, string operation, string entityType, Guid entityId,
@@ -59,4 +64,20 @@ public sealed class VehicleStore(DealerOsDbContext dbContext) : IVehicleStore, I
         select new VehicleResponse(vehicle.Id, vehicle.BranchId, branch.Name, vehicle.Vin, vehicle.Make, vehicle.Model,
             vehicle.Year, vehicle.MileageKm, vehicle.PlannedPurchaseAmount, vehicle.Currency, vehicle.Status.ToString(),
             vehicle.StockNumber, vehicle.CreatedAt, vehicle.AcceptedAt, vehicle.Version);
+
+    private static bool IsPostgresConcurrencyConflict(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is PostgresException
+                {
+                    SqlState: PostgresErrorCodes.DeadlockDetected or PostgresErrorCodes.SerializationFailure
+                })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

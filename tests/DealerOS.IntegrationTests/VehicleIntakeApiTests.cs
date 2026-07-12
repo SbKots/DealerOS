@@ -19,6 +19,7 @@ namespace DealerOS.IntegrationTests;
 public sealed class VehicleIntakeApiTests : IAsyncLifetime
 {
     private const string JwtKey = "integration-test-signing-key-with-at-least-32-characters";
+    private string _connectionString = string.Empty;
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("dealeros_tests")
         .WithUsername("dealeros")
@@ -26,13 +27,42 @@ public sealed class VehicleIntakeApiTests : IAsyncLifetime
         .WithWaitStrategy(Wait.ForUnixContainer().UntilCommandIsCompleted("pg_isready", "-U", "dealeros"))
         .Build();
 
-    public Task InitializeAsync() => _postgres.StartAsync();
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        var connectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString())
+        {
+            Pooling = false,
+            SslMode = SslMode.Disable
+        }.ConnectionString;
+
+        Exception? lastError = null;
+        for (var attempt = 1; attempt <= 10; attempt++)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync();
+                await using var command = new NpgsqlCommand("SELECT 1", connection);
+                _ = await command.ExecuteScalarAsync();
+                _connectionString = connectionString;
+                return;
+            }
+            catch (NpgsqlException exception) when (attempt < 10)
+            {
+                lastError = exception;
+                await Task.Delay(TimeSpan.FromMilliseconds(attempt * 200));
+            }
+        }
+
+        throw new InvalidOperationException("PostgreSQL test container did not become ready.", lastError);
+    }
     public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
 
     [Fact]
     public async Task IntakeHappyPath_IsAuditedPersistedAndIsolated()
     {
-        await using var factory = new DealerOsApiFactory(_postgres.GetConnectionString());
+        await using var factory = new DealerOsApiFactory(_connectionString);
         using var volga = factory.CreateClient();
         await AuthenticateAsync(volga, "admin@volga-auto.demo");
 
@@ -63,7 +93,7 @@ public sealed class VehicleIntakeApiTests : IAsyncLifetime
     [Fact]
     public async Task AuthenticationPermissionsAndBranchScope_AreEnforcedServerSide()
     {
-        await using var factory = new DealerOsApiFactory(_postgres.GetConnectionString());
+        await using var factory = new DealerOsApiFactory(_connectionString);
         using var anonymous = factory.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/vehicles")).StatusCode);
 
@@ -82,7 +112,7 @@ public sealed class VehicleIntakeApiTests : IAsyncLifetime
     [Fact]
     public async Task InvalidInput_ReturnsProblemDetailsInsteadOfInternalErrors()
     {
-        await using var factory = new DealerOsApiFactory(_postgres.GetConnectionString());
+        await using var factory = new DealerOsApiFactory(_connectionString);
         using var client = factory.CreateClient();
 
         var loginWithoutEmail = await client.PostAsJsonAsync("/api/auth/login", new { password = "x" });
@@ -112,7 +142,7 @@ public sealed class VehicleIntakeApiTests : IAsyncLifetime
     [Fact]
     public async Task TenantIdCannotBeSpoofed_AndVinUniquenessIsTenantAware()
     {
-        await using var factory = new DealerOsApiFactory(_postgres.GetConnectionString());
+        await using var factory = new DealerOsApiFactory(_connectionString);
         const string vin = "XTA210990Y0000031";
         using var volga = factory.CreateClient();
         await AuthenticateAsync(volga, "admin@volga-auto.demo");
@@ -144,7 +174,7 @@ public sealed class VehicleIntakeApiTests : IAsyncLifetime
     [Fact]
     public async Task ConcurrentDuplicateVin_CreatesExactlyOneVehicle()
     {
-        await using var factory = new DealerOsApiFactory(_postgres.GetConnectionString());
+        await using var factory = new DealerOsApiFactory(_connectionString);
         using var client = factory.CreateClient();
         await AuthenticateAsync(client, "admin@volga-auto.demo");
         const string vin = "XTA210990Y0000041";
@@ -161,28 +191,33 @@ public sealed class VehicleIntakeApiTests : IAsyncLifetime
     [Fact]
     public async Task ConcurrentAndRepeatedAcceptance_PreservesSingleTransition()
     {
-        await using var factory = new DealerOsApiFactory(_postgres.GetConnectionString());
+        await using var factory = new DealerOsApiFactory(_connectionString);
         using var client = factory.CreateClient();
         await AuthenticateAsync(client, "admin@volga-auto.demo");
-        var created = await client.PostAsJsonAsync("/api/vehicles", VehicleRequest("XTA210990Y0000051"));
-        var vehicleId = (await ReadJsonAsync(created)).GetProperty("id").GetGuid();
 
-        var responses = await Task.WhenAll(
-            client.PostAsync($"/api/vehicles/{vehicleId}/accept-to-stock", null),
-            client.PostAsync($"/api/vehicles/{vehicleId}/accept-to-stock", null));
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            var created = await client.PostAsJsonAsync("/api/vehicles", VehicleRequest($"XTA210990Y{51 + attempt:0000000}"));
+            var vehicleId = (await ReadJsonAsync(created)).GetProperty("id").GetGuid();
 
-        Assert.Single(responses, x => x.StatusCode == HttpStatusCode.OK);
-        Assert.Single(responses, x => x.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict);
-        Assert.Equal(HttpStatusCode.BadRequest,
-            (await client.PostAsync($"/api/vehicles/{vehicleId}/accept-to-stock", null)).StatusCode);
-        Assert.Equal(2, await factory.QueryDbAsync(db => db.VehicleStatusHistory.CountAsync(x => x.VehicleId == vehicleId)));
-        Assert.Equal(2, await factory.CountAuditEventsAsync(DemoSeed.VolgaOrganizationId, vehicleId));
+            var responses = await Task.WhenAll(
+                client.PostAsync($"/api/vehicles/{vehicleId}/accept-to-stock", null),
+                client.PostAsync($"/api/vehicles/{vehicleId}/accept-to-stock", null));
+
+            Assert.DoesNotContain(responses, x => x.StatusCode == HttpStatusCode.InternalServerError);
+            Assert.Single(responses, x => x.StatusCode == HttpStatusCode.OK);
+            Assert.Single(responses, x => x.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict);
+            Assert.Equal(HttpStatusCode.BadRequest,
+                (await client.PostAsync($"/api/vehicles/{vehicleId}/accept-to-stock", null)).StatusCode);
+            Assert.Equal(2, await factory.QueryDbAsync(db => db.VehicleStatusHistory.CountAsync(x => x.VehicleId == vehicleId)));
+            Assert.Equal(2, await factory.CountAuditEventsAsync(DemoSeed.VolgaOrganizationId, vehicleId));
+        }
     }
 
     [Fact]
     public async Task BlockAndPermissionChanges_RevokeExistingSessions()
     {
-        await using var factory = new DealerOsApiFactory(_postgres.GetConnectionString());
+        await using var factory = new DealerOsApiFactory(_connectionString);
         using var client = factory.CreateClient();
         await AuthenticateAsync(client, "admin@volga-auto.demo");
 
@@ -208,7 +243,7 @@ public sealed class VehicleIntakeApiTests : IAsyncLifetime
     [Fact]
     public async Task ExpiredToken_IsRejected()
     {
-        await using var factory = new DealerOsApiFactory(_postgres.GetConnectionString());
+        await using var factory = new DealerOsApiFactory(_connectionString);
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateExpiredToken());
 
@@ -218,7 +253,7 @@ public sealed class VehicleIntakeApiTests : IAsyncLifetime
     [Fact]
     public async Task LoginEndpoint_IsRateLimited()
     {
-        await using var factory = new DealerOsApiFactory(_postgres.GetConnectionString());
+        await using var factory = new DealerOsApiFactory(_connectionString);
         using var client = factory.CreateClient();
         var responses = new List<HttpResponseMessage>();
         for (var attempt = 0; attempt < 11; attempt++)
@@ -233,7 +268,7 @@ public sealed class VehicleIntakeApiTests : IAsyncLifetime
     [Fact]
     public async Task DatabaseConstraints_RejectCrossTenantLinksAndInvalidMoney()
     {
-        await using var factory = new DealerOsApiFactory(_postgres.GetConnectionString());
+        await using var factory = new DealerOsApiFactory(_connectionString);
         _ = factory.CreateClient();
 
         var crossBranch = await Assert.ThrowsAsync<PostgresException>(() => factory.ExecuteDbAsync(db =>
