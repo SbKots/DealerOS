@@ -2,120 +2,150 @@
 
 ## 1. Итог
 
-- Вердикт: **NOT READY** — удалённый CI и повторная проверка из чистого клона точного commit SHA ожидаются.
+- Вердикт: **READY WITH NOTES**.
 - Проверяемый режим: **итерация 0.1**, вертикальный срез «Добавление автомобиля и приём на склад».
-- Проверяемое состояние: ветка `master`, рабочее дерево без коммитов; вся реализация является новым, ещё не зафиксированным набором файлов. Удалённый `origin`: `https://github.com/SbKots/DealerOS.git`.
-- Дата проверки: 2026-07-12.
+- Ветка: `codex/verification-baseline`.
+- Точный проверенный commit: `5323b0fccd86fa215835dab6c9a3257d9070e2e5`.
+- GitHub Actions: [CI run 29209046043 — success](https://github.com/SbKots/DealerOS/actions/runs/29209046043).
+- Дата завершения проверки: 2026-07-13, Europe/Moscow.
+- Clean clone: `C:\Users\SberKot\Documents\DealerOS-clean-5323b0f`, detached HEAD на указанном SHA.
+- Артефакты: `C:\Users\SberKot\Documents\DealerOS-verification-artifacts\5323b0fccd86fa215835dab6c9a3257d9070e2e5`.
 
-Основной сценарий работает через React UI, HTTP API и реальный PostgreSQL. Сервер проверяет права, организацию и филиал; VIN и денежные значения защищены доменными правилами и ограничениями БД; создание и приём формируют историю и аудит. После первичной диагностики исправлены три MAJOR и четыре MINOR; открытых BLOCKER, CRITICAL и MAJOR не осталось. Локальный прогон сборки и тестов прошёл, однако итоговая готовность не подтверждена до завершения удалённого CI и clean-clone проверки точного commit SHA.
+Основной сценарий подтверждён через React UI, HTTP API и реальный PostgreSQL. Сервер проверяет актуальные права, организацию и филиал; VIN, денежные значения и tenant-связи защищены доменными правилами и ограничениями БД; создание и приём формируют историю и аудит. После первичной проверки и повторной проверки точного commit исправлены 4 MAJOR и 6 MINOR; открытых BLOCKER, CRITICAL и MAJOR нет. Успешно завершены удалённый CI и строгий запуск из нового Windows clone по README. Статус относится к demo-ready итерации 0.1, а не к production-ready полному DealerOS.
 
 ## 2. Проверенный scope
 
-Обязательные функции итерации:
+В scope входят:
 
-- вход demo-сотрудника;
+- demo-login сотрудника и немедленный отзыв заблокированной/изменённой сессии;
 - выбор только разрешённого филиала;
 - создание поступления купленного автомобиля;
-- проверка и tenant-aware уникальность VIN;
-- хранение закупочной цены как `decimal` с кодом валюты;
-- переход `IntakeDraft -> InStock` отдельной серверной командой;
+- обязательность, формат и tenant-aware уникальность VIN;
+- закупочная цена как `decimal` с кодом валюты;
+- отдельная команда и переход `IntakeDraft -> InStock`;
 - складской номер, история статуса и аудит критических действий;
 - реестр и карточка автомобиля;
-- изоляция двух организаций и филиальные/permission-ограничения;
-- миграции PostgreSQL, Docker Compose, документация и CI skeleton.
+- изоляция двух организаций, филиальные ограничения и permissions;
+- конкурентное создание и конкурентный/повторный приём;
+- миграции PostgreSQL, Docker Compose, документация и GitHub Actions.
 
-Сознательно отложены: осмотр и дефекты, подготовка и plan/fact расходы, публикация, CRM/лиды, тест-драйвы, скидки, бронь, сделки, документы, выдача, прибыль, файлы, фоновые задачи и внешние интеграции. Это roadmap после итерации 0.1, а не неполнота проверяемого среза.
+Сознательно отложены: осмотр и дефекты, подготовка и plan/fact расходы, публикация, CRM/лиды, тест-драйвы, скидки, бронь, сделки, документы, выдача, прибыль, файлы, фоновые задачи и внешние интеграции. Они отмечены как NOT APPLICABLE для 0.1, а не как PASS.
 
-Основной сквозной сценарий: сотрудник входит, выбирает разрешённый филиал, создаёт паспорт автомобиля, принимает его на склад и видит сохранённую карточку со статусом и складским номером. Источники требований: `DealerOS_master_prompt_ru.txt`, `DealerOS_verification_prompt_ru.txt`, `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, ADR 0001, README и код текущего рабочего дерева.
+Основной сценарий: сотрудник входит, выбирает разрешённый филиал, создаёт паспорт автомобиля, принимает автомобиль на склад и после reload видит сохранённую карточку со статусом и складским номером. Источники требований: `DealerOS_master_prompt_ru.txt`, `DealerOS_verification_prompt_ru.txt`, `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, ADR 0001, README и commit `5323b0fccd86fa215835dab6c9a3257d9070e2e5`.
 
 ## 3. Матрица требований
 
 | ID | Требование | Статус | Доказательство | Примечание |
 |----|------------|--------|---------------|------------|
-| R01 | Авторизованный вход | PASS | `AuthEndpoints`, `JwtTokenService`; integration `ExpiredToken_IsRejected`, e2e | Demo login, не production IdP |
-| R02 | Организация берётся из проверенной identity | PASS | `ActorContextFactory`; `TenantIdCannotBeSpoofed_AndVinUniquenessIsTenantAware` | Клиентский `OrganizationId` игнорируется |
-| R03 | Разрешённый филиал и межфилиальная защита | PASS | `AuthenticationPermissionsAndBranchScope_AreEnforcedServerSide` | Есть второй филиал в demo seed |
-| R04 | Permission на создание и приём | PASS | серверные authorization policies; read-only integration test | Не зависит от скрытия кнопок UI |
-| R05 | Создание поступления через API/UI | PASS | `VehicleIntakeService`, `VehicleEndpoints`; happy-path integration и e2e | Сохраняется как `IntakeDraft` |
-| R06 | VIN обязателен и валиден | PASS | `Vin`; unit и invalid-input integration tests | Нормализация до upper-case |
-| R07 | VIN уникален внутри организации | PASS | unique index `(OrganizationId, Vin)`; concurrency integration test | Один VIN допустим в другой организации |
-| R08 | Марка/модель/год/пробег валидируются | PASS | domain + DB checks; unit/integration tests | Длина марки/модели не более 100 |
-| R09 | Деньги считаются как decimal | PASS | `Money`, `numeric(18,2)`, DB checks; boundary unit/integration tests | Банковское округление, RUB в UI |
-| R10 | Данные сохраняются в PostgreSQL | PASS | Testcontainers integration suite; Compose stack | In-memory provider не используется |
-| R11 | Приём — отдельная команда и допустимый переход | PASS | `AcceptToStock`; unit/integration/e2e | Повторная команда даёт conflict |
-| R12 | Складской номер создаётся при приёме | PASS | happy-path integration и e2e | Отображается в карточке |
-| R13 | История статуса неизбыточна | PASS | `VehicleStatusHistory`; happy/concurrency tests | При гонке создаётся один переход |
-| R14 | Аудит критических действий | PASS | `AuditEvent`; happy-path assertions | Создание, приём и успешный login |
-| R15 | Реестр и карточка показывают сохранённые данные | PASS | React component tests и Playwright | E2E выполняет reload после создания |
-| R16 | Tenant isolation двух организаций | PASS | IDOR/spoofing tests + tenant-aware composite FKs | Проверено и на API, и напрямую в БД |
-| R17 | Повторные/конкурентные запросы не портят данные | PASS | duplicate VIN и concurrent acceptance integration tests | Ровно один успешный результат |
-| R18 | Ошибки клиента возвращаются как Problem Details | PASS | invalid JSON/null/range integration tests | 400/401/403/404/409 без утечки stack trace |
-| R19 | Воспроизводимый локальный запуск | PASS | `docker compose up --build -d`, health и e2e | README соответствует командам |
-| R20 | Миграции создают и обновляют схему | PASS | чистые Testcontainers БД + upgrade существующего Compose volume | Pending model changes отсутствуют |
-| R21 | CI описывает ключевые проверки | PASS | `.github/workflows/ci.yml` | Сам GitHub Actions ещё не запускался |
+| R01 | Авторизованный вход | PASS | `apps/api/Auth/AuthEndpoints.cs`; `ExpiredToken_IsRejected`; Playwright | Demo login, не production IdP |
+| R02 | Tenant берётся из проверенной identity | PASS | `apps/api/Infrastructure/ActorContextFactory.cs`; spoofing integration test | Клиентский `OrganizationId` игнорируется |
+| R03 | Филиальная изоляция | PASS | `AuthenticationPermissionsAndBranchScope_AreEnforcedServerSide` | Проверен прямой API-запрос |
+| R04 | Серверные permissions create/accept | PASS | `apps/api/Program.cs`; read-only integration test | Не зависит от UI |
+| R05 | Создание поступления через API/UI | PASS | happy-path integration и Playwright | Начальный статус `IntakeDraft` |
+| R06 | VIN обязателен и валиден | PASS | `modules/Vehicles/Domain/Vin.cs`; unit/integration tests | Нормализуется до upper-case |
+| R07 | VIN уникален внутри tenant | PASS | unique index `(OrganizationId, Vin)`; race test | Такой же VIN допустим в другом tenant |
+| R08 | Марка, модель, год и пробег валидируются | PASS | domain и DB checks; boundary tests | Марка/модель до 100 символов |
+| R09 | Денежные значения точны | PASS | `modules/SharedKernel/Money.cs`; `numeric(19,2)`; boundary tests | Банковское округление |
+| R10 | PostgreSQL persistence | PASS | Testcontainers suite и Compose | In-memory provider не используется |
+| R11 | Допустимый отдельный переход приёма | PASS | `AcceptToStock`; unit/integration/e2e | Повтор даёт 400, race loser 409 |
+| R12 | Складской номер | PASS | happy-path integration и e2e | Видим в карточке |
+| R13 | Единственная история перехода | PASS | 10 race-повторов и DB assertions | Нет дублирования при deadlock/conflict |
+| R14 | Аудит критических действий | PASS | audit assertions | Создание, приём, успешный login |
+| R15 | Реестр/карточка после reload | PASS | component tests и Playwright | Проверяется сохранённое состояние |
+| R16 | Tenant isolation двух организаций | PASS | IDOR/spoofing/API и DB FK tests | Защита приложения и БД |
+| R17 | Повторы/конкурентность сохраняют целостность | PASS | duplicate VIN и 10 accept races | 500 не допускается |
+| R18 | Problem Details | PASS | malformed/null/range integration tests | 400/401/403/404/409 без stack trace |
+| R19 | Чистый запуск по README | PASS | новый clone exact SHA; полный прогон 144.4 с | Старые volumes/build outputs не использованы |
+| R20 | Fresh DB и upgrade migrations | PASS | Testcontainers и upgrade существующей demo DB | Pending model changes отсутствуют |
+| R21 | Удалённый CI | PASS | [run 29209046043](https://github.com/SbKots/DealerOS/actions/runs/29209046043) | backend/frontend/e2e success |
 | R22 | Осмотр/дефекты/подготовка | NOT APPLICABLE | `docs/BACKLOG.md` | Следующая итерация |
-| R23 | Бронь/скидка/сделка/закрытие | NOT APPLICABLE | `docs/PRODUCT.md`, backlog | После MVP-срезов |
-| R24 | Файлы/object storage | NOT APPLICABLE | `docs/BACKLOG.md` | Появится вместе с фото осмотра |
-| R25 | Внешние интеграции и фоновые задачи | NOT APPLICABLE | `docs/PRODUCT.md` | В текущем коде отсутствуют намеренно |
+| R23 | Бронь/скидка/сделка/закрытие | NOT APPLICABLE | `docs/PRODUCT.md` | Будущие срезы |
+| R24 | Файлы/object storage | NOT APPLICABLE | `docs/BACKLOG.md` | Вместе с фото осмотра |
+| R25 | Интеграции/фоновые задачи | NOT APPLICABLE | `docs/PRODUCT.md` | Намеренно отсутствуют |
 
 ## 4. Результаты автоматических проверок
 
-| Проверка | Команда | Результат | Длительность/детали |
-|----------|---------|-----------|---------------------|
-| Restore backend | `dotnet restore DealerOS.slnx` | PASS | Все проекты восстановлены |
-| Форматирование | `dotnet format DealerOS.slnx --verify-no-changes --no-restore` | PASS | Изменений не требуется |
-| Backend build | `dotnet build DealerOS.slnx -c Release --no-restore` | PASS | 0 warnings, 0 errors; около 5 с |
-| Unit tests | `dotnet test ... -c Release --no-build` | PASS | 12/12, skipped 0, failed 0; 276 мс |
-| PostgreSQL integration tests | та же команда | PASS | 10/10, skipped 0, failed 0; 53 с; каждый test использует изолированный PostgreSQL container |
-| EF model/migrations | `dotnet tool run dotnet-ef migrations has-pending-model-changes ...` | PASS | Модель полностью отражена миграциями |
+Все команды ниже запускались реально. Команды с рабочим каталогом `apps/web` выполнялись после `Set-Location apps/web`.
+
+| Проверка | Точная команда | Результат | Детали |
+|----------|----------------|-----------|--------|
+| Backend restore | `dotnet restore DealerOS.slnx` | PASS | Clean clone |
+| Форматирование | `dotnet format DealerOS.slnx --verify-no-changes --no-restore` | PASS | Clean clone с LF checkout |
+| README backend build | `dotnet build DealerOS.slnx --no-restore` | PASS | 0 warnings, 0 errors; 6.35 с |
+| README backend tests | `dotnet test DealerOS.slnx --no-build` | PASS | Unit 12/12; integration 10/10; skipped 0; failed 0 |
+| Release build | `dotnet build DealerOS.slnx -c Release --no-restore` | PASS | 0 warnings, 0 errors |
+| Release tests | `dotnet test DealerOS.slnx -c Release --no-build --logger "console;verbosity=minimal"` | PASS | Два последовательных локальных прогона 22/22 |
+| EF model/migrations | `dotnet tool run dotnet-ef migrations has-pending-model-changes --project apps/api/DealerOS.Api.csproj --startup-project apps/api/DealerOS.Api.csproj --context DealerOsDbContext` | PASS | Pending changes отсутствуют |
 | NuGet vulnerabilities | `dotnet list DealerOS.slnx package --vulnerable --include-transitive` | PASS | Уязвимые пакеты не найдены |
 | Frontend install | `npm ci` | PASS | 127 packages из lockfile |
 | Frontend lint | `npm run lint` | PASS | Ошибок нет |
-| Frontend component tests | `npm run test` | PASS | 2/2, skipped 0, failed 0; 3.36 с |
-| TypeScript + production build | `npm run build` | PASS | `tsc -b` и Vite; JS 334.65 KB, gzip 101.59 KB |
+| Frontend tests | `npm run test` | PASS | 2/2, skipped 0, failed 0; 2.99 с в clean clone |
+| TypeScript/Vite build | `npm run build` | PASS | 334.65 KB JS, gzip 101.59 KB |
 | npm vulnerabilities | `npm audit --audit-level=high --registry=https://registry.npmjs.org` | PASS | 0 vulnerabilities |
-| Compose validation | `docker compose config --quiet` | PASS | Конфигурация валидна |
-| Clean container build/start | `docker compose up --build -d` | PASS | PostgreSQL, API и web запущены |
-| E2E | `npm run test:e2e` | PASS | 2/2 Chromium; desktop happy path и tablet validation; 6.4 с |
-| Liveness/readiness | HTTP `/health/live`, `/health/ready`, `/health` | PASS | 200/200/200 при работающей БД |
-| Readiness при отказе БД | остановка/запуск контейнера PostgreSQL | PASS | live 200, ready 503; после восстановления ready 200 |
-| OpenAPI | GET `/swagger/v1/swagger.json` | PASS | Документ `DealerOS API v1` доступен в Development |
-| Production key guard | запуск API в Production с local key | PASS | Процесс отказался стартовать с ожидаемой ошибкой |
-| Backup/restore drill | `pg_dump -Fc` -> `pg_restore --exit-on-error` во временную БД | PASS | 3 migrations, 2 organizations, 7 vehicles восстановлены |
-| Статический hygiene scan | `rg` по conflict/TODO/FIXME/HACK/private-key/token patterns | PASS | Совпадений в продуктовых файлах нет |
+| Compose validation | `docker compose config --quiet` | PASS | Валидная конфигурация |
+| Clean Compose build/start | `docker compose up --build -d` | PASS | Новые volume, network и containers |
+| E2E по README | `npm run test:e2e` | PASS | Chromium 2/2; 4.0 с |
+| Liveness | `Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:5080/health/live"` | PASS | HTTP 200 |
+| Readiness | `Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:5080/health/ready"` | PASS | HTTP 200; при остановленной БД HTTP 503 |
+| OpenAPI | `Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:5080/swagger/v1/swagger.json"` | PASS | `DealerOS API v1` |
+| Production key guard | `docker run --rm -e ASPNETCORE_ENVIRONMENT=Production -e Jwt__Key=local-compose-only-change-before-deployment-DealerOS-2026 dealeros-api` | PASS | Startup отклонён ожидаемой ошибкой |
+| Artifact backend tests | `dotnet test DealerOS.slnx --no-build --results-directory "C:\Users\SberKot\Documents\DealerOS-verification-artifacts\5323b0fccd86fa215835dab6c9a3257d9070e2e5\test-results\backend" --logger "trx;LogFilePrefix=DealerOS"` | PASS | Два TRX, 22/22 |
+| Artifact API publish | `dotnet publish apps/api/DealerOS.Api.csproj -c Release --no-restore -o "C:\Users\SberKot\Documents\DealerOS-verification-artifacts\5323b0fccd86fa215835dab6c9a3257d9070e2e5\build\api" -bl:"C:\Users\SberKot\Documents\DealerOS-verification-artifacts\5323b0fccd86fa215835dab6c9a3257d9070e2e5\build\backend-publish.binlog"` | PASS | Release publish и MSBuild binlog |
+| Artifact Vitest | `npx vitest run --reporter=junit --outputFile="C:\Users\SberKot\Documents\DealerOS-verification-artifacts\5323b0fccd86fa215835dab6c9a3257d9070e2e5\test-results\frontend\vitest-junit.xml"` | PASS | JUnit 2/2 |
+| Artifact Playwright | `npx playwright test --reporter=html,junit` | PASS | HTML/JUnit 2/2; output paths заданы env vars |
+
+Строгий clean-clone сценарий:
+
+```powershell
+git clone --branch codex/verification-baseline --single-branch https://github.com/SbKots/DealerOS.git C:\Users\SberKot\Documents\DealerOS-clean-5323b0f
+git -C C:\Users\SberKot\Documents\DealerOS-clean-5323b0f checkout --detach 5323b0fccd86fa215835dab6c9a3257d9070e2e5
+docker compose up --build -d
+dotnet restore DealerOS.slnx
+dotnet format DealerOS.slnx --verify-no-changes --no-restore
+dotnet build DealerOS.slnx --no-restore
+dotnet test DealerOS.slnx --no-build
+Set-Location apps/web
+npm ci
+npm run lint
+npm run test
+npm run build
+npm run test:e2e
+```
+
+Результат: PASS, общий orchestration time 144.4 с. Git status clean clone после checkout был пуст; проверяемый HEAD точно совпал с `5323b0fccd86fa215835dab6c9a3257d9070e2e5`.
 
 ## 5. Сквозные сценарии
 
 ### S01. Добавление и приём автомобиля
 
-- Предусловия: Compose stack, demo-организация Volga Auto, активный admin с правами, разрешённый филиал.
-- Шаги: login; заполнение VIN, марки, модели, года, пробега и цены; создание; команда приёма; reload страницы.
-- Результат: автомобиль сохранён в PostgreSQL, статус `InStock`, присвоен складской номер, в истории ровно два состояния, записаны audit events, карточка после reload показывает данные.
-- Доказательство: `IntakeHappyPath_IsAuditedPersistedAndIsolated`, Playwright `desktop intake happy path`.
+- Предусловия: чистый Compose stack, Volga Auto, активный admin, разрешённый филиал.
+- Шаги: login; ввод VIN/марки/модели/года/пробега/цены; create; accept; reload.
+- Результат: PostgreSQL содержит автомобиль `InStock`, складской номер, две записи истории и два vehicle audit events; карточка после reload показывает данные.
+- Доказательство: `tests/DealerOS.IntegrationTests/VehicleIntakeApiTests.cs::IntakeHappyPath_IsAuditedPersistedAndIsolated`; `apps/web/e2e/intake.spec.ts`.
 - Статус: PASS.
 
 ### S02. Изоляция организации и филиала
 
-- Предусловия: две организации, два филиала Volga Auto, admin и read-only пользователь.
-- Шаги: прямые API-запросы без токена, без permission, из другого филиала/tenant; попытка подменить `OrganizationId`; чтение чужого ID.
-- Результат: 401/403/404; чужие данные не раскрыты и не изменены; tenant определяется сервером.
-- Доказательство: `AuthenticationPermissionsAndBranchScope_AreEnforcedServerSide`, `TenantIdCannotBeSpoofed_AndVinUniquenessIsTenantAware`, `IntakeHappyPath_IsAuditedPersistedAndIsolated`.
+- Предусловия: две организации, два филиала Volga Auto, admin и viewer.
+- Шаги: запросы без токена, без permission, из другого branch/tenant; spoofed `OrganizationId`; чтение чужого ID.
+- Результат: 401/403/404; чужие данные не раскрыты и не изменены.
+- Доказательство: `AuthenticationPermissionsAndBranchScope_AreEnforcedServerSide`, `TenantIdCannotBeSpoofed_AndVinUniquenessIsTenantAware`, DB constraint test.
 - Статус: PASS.
 
-### S03. Повторы и гонки
+### S03. Повторы, гонки и PostgreSQL deadlock
 
-- Предусловия: одна организация и валидный VIN/черновик.
-- Шаги: два конкурентных создания одного VIN; два конкурентных приёма; последующий повтор команды.
-- Результат: ровно одно создание и один переход; второй запрос получает conflict; история и аудит не дублируются.
+- Предусловия: валидный VIN/черновик.
+- Шаги: два concurrent create одного VIN; десять пар concurrent accept; повтор каждой команды.
+- Результат: ровно одно создание и один переход; loser получает 400/409, никогда 500; история/аудит не дублируются.
 - Доказательство: `ConcurrentDuplicateVin_CreatesExactlyOneVehicle`, `ConcurrentAndRepeatedAcceptance_PreservesSingleTransition`.
 - Статус: PASS.
 
-### S04. Мобильная/планшетная валидация
+### S04. Tablet validation
 
-- Предусловия: tablet viewport, открытая форма.
+- Предусловия: tablet viewport.
 - Шаги: отправка некорректных обязательных данных.
-- Результат: ошибки видны, приложение не падает, browser console/page errors отсутствуют.
-- Доказательство: второй Playwright test.
+- Результат: ошибки видны, browser console/page errors отсутствуют.
+- Доказательство: `apps/web/e2e/intake.spec.ts`.
 - Статус: PASS.
 
 ## 6. Найденные проблемы
@@ -124,99 +154,98 @@
 |----------|---------|------------|----------|
 | BLOCKER | 0 | 0 | 0 |
 | CRITICAL | 0 | 0 | 0 |
-| MAJOR | 3 | 3 | 0 |
-| MINOR | 4 | 4 | 0 |
+| MAJOR | 4 | 4 | 0 |
+| MINOR | 6 | 6 | 0 |
 | NOTE | 5 | 0 | 5 |
 
-Важные исправленные находки:
+- **MAJOR M-01 — invalid input возвращал 500.** Пути: `modules/SharedKernel/Money.cs`, `modules/Vehicles/Domain/Vin.cs`, `modules/Vehicles/Domain/Vehicle.cs`, `modules/Vehicles/Application/Contracts.cs`, `apps/api/Infrastructure/ApiExceptionMiddleware.cs`, `tests/DealerOS.IntegrationTests/VehicleIntakeApiTests.cs`. Missing VIN/currency, oversized make и malformed JSON теперь дают `application/problem+json` 400.
+- **MAJOR M-02 — старый JWT сохранял доступ после блокировки/отзыва permission.** Пути: `apps/api/Program.cs`, `apps/api/Auth/JwtTokenService.cs`, `tests/DealerOS.IntegrationTests/VehicleIntakeApiTests.cs`. Каждый защищённый запрос сверяет active state, permissions и branches с БД.
+- **MAJOR M-03 — БД допускала cross-tenant связи при обходе приложения.** Пути: `apps/api/Infrastructure/DealerOsDbContext.cs`, `apps/api/Infrastructure/Migrations/20260712181329_TenantIntegrityAndValidation.cs`, `apps/api/Infrastructure/Migrations/DealerOsDbContextModelSnapshot.cs`, `tests/DealerOS.IntegrationTests/VehicleIntakeApiTests.cs`. Добавлены composite tenant FK, backfill и checks.
+- **MAJOR M-04 — конкурентный accept иногда возвращал 500 при PostgreSQL deadlock `40P01`.** Пути: `apps/api/Infrastructure/VehicleStore.cs`, `tests/DealerOS.IntegrationTests/VehicleIntakeApiTests.cs`. Вложенные deadlock/serialization failures преобразуются в 409; reproducer выполняет десять race-пар и запрещает 500.
+- **MINOR m-01 — frontend зависал в повреждённой/истёкшей сессии.** Пути: `apps/web/src/api.ts`, `apps/web/src/App.tsx`, `apps/web/src/App.test.tsx`. 401/corrupt storage очищают session и возвращают login.
+- **MINOR m-02 — demo seed не был инкрементально идемпотентным.** Путь: `apps/api/Infrastructure/DemoSeed.cs`. Каждый demo-объект добавляется независимо.
+- **MINOR m-03 — liveness и readiness были объединены.** Пути: `apps/api/Program.cs`, `README.md`, `docs/RUNBOOK.md`. Добавлены `/health/live` и `/health/ready`.
+- **MINOR m-04 — login не имел rate limit и success audit.** Пути: `apps/api/Auth/AuthEndpoints.cs`, `apps/api/Program.cs`, `tests/DealerOS.IntegrationTests/VehicleIntakeApiTests.cs`. Добавлены 10 requests/min/IP и audit.
+- **MINOR m-05 — GitHub runner параллельно/слишком рано запускал PostgreSQL test containers.** Пути: `tests/DealerOS.IntegrationTests/AssemblyInfo.cs`, `tests/DealerOS.IntegrationTests/VehicleIntakeApiTests.cs`. Integration assembly сериализован; после `StartAsync` выполняется bounded `SELECT 1` readiness probe. Первый CI [29208404838](https://github.com/SbKots/DealerOS/actions/runs/29208404838) воспроизвёл отказ, run 29209046043 подтвердил исправление.
+- **MINOR m-06 — clean Windows clone получал CRLF и падал на README format check.** Пути: `.gitattributes`, `.editorconfig`. Первый clean clone commit `42576e9ef0021e7b9f32e39ddb9f8af996f80916` воспроизвёл ENDOFLINE; commit `5323b0fccd86fa215835dab6c9a3257d9070e2e5` checkout имеет `i/lf w/lf` и проходит.
 
-- **MAJOR M-01 — invalid input приводил к 500.** Missing VIN/currency, слишком длинная марка и malformed JSON проходили вне согласованной обработки ошибок. Исправлено nullable-контрактами, безопасной доменной валидацией и middleware, возвращающим `application/problem+json`.
-- **MAJOR M-02 — старый JWT сохранял доступ после блокировки/отзыва permission.** Причина — доверие неизменяемым claims до истечения токена. Теперь каждый защищённый запрос сверяет активность, права и филиалы с текущей БД.
-- **MAJOR M-03 — БД допускала cross-tenant связи при обходе приложения.** Причина — обычные FK по `Id` без tenant component. Добавлены composite alternate keys/FK, backfill миграция и DB-level отрицательные тесты.
-- **MINOR m-01 — frontend мог оставаться в сломанной сессии после 401 или повреждённого localStorage.** Сессия теперь очищается, UI возвращается к login; добавлен component test.
-- **MINOR m-02 — demo seed прекращался после обнаружения любой организации.** Seed сделан поэлементно идемпотентным и пригодным для upgrade существующей demo-БД.
-- **MINOR m-03 — liveness и readiness были объединены.** Добавлены отдельные endpoints и проверка поведения при недоступной БД.
-- **MINOR m-04 — login не имел rate limit и успешного audit event.** Добавлено ограничение 10 запросов/минуту на IP и аудит успешного входа.
-
-Открытые NOTE: demo identity вместо реального IdP/MFA; отсутствие TLS/secret-manager/security-header hardening; отсутствие централизованных метрик/логов и нагрузочного теста; mutable container tags и непроверенный удалённый CI; браузерная проверка ограничена Chromium и не заменяет usability/accessibility-сессию с сотрудниками.
+Открытые NOTE: demo identity вместо IdP/MFA; отсутствие TLS/secret-manager/security-header hardening; отсутствие централизованных метрик/логов и нагрузки; mutable container tags; только Chromium без полноценной accessibility/usability-сессии.
 
 ## 7. Выполненные исправления
 
-1. **Валидация и Problem Details.** Причина: исключения десериализации и null входили в обработчики неодинаково. Изменены HTTP-контракты, `Vin`, `Money`, `Vehicle`, route options и exception middleware. Добавлены unit и integration cases для null, malformed JSON, длины, отрицательных/предельных сумм и валюты. Повторный полный прогон: PASS.
-2. **Немедленный отзыв доступа.** Причина: JWT был единственным источником текущего состояния пользователя. JWT validation event теперь загружает user/branch access и сравнивает права. Добавлены тесты блокировки и изменения permission на уже выданном токене. Повторный прогон: PASS.
-3. **Tenant integrity в PostgreSQL.** Причина: single-column FK не гарантировали совпадение tenant. Добавлены `OrganizationId` в access rows, composite keys/FK и check constraints; миграция содержит backfill. Добавлен прямой DB-тест cross-tenant ссылок и отрицательной цены. Fresh DB и upgrade существующей БД: PASS.
-4. **Конкурентность.** Уникальность VIN и concurrency token проверены параллельными запросами; conflict translation сохраняет целостность. Повторный прогон: PASS.
-5. **Frontend recovery и UX ошибок.** 401 очищает session и переводит к login; corrupt storage не ломает старт; query errors показаны пользователю; поля марки/модели имеют те же пределы, что сервер. Component и e2e: PASS.
-6. **Эксплуатационные проверки.** Разделены live/ready, добавлены rate limit, production key guard, vulnerability scans и гарантированный Compose cleanup в CI. Проверены DB outage, restore и startup guard: PASS.
+1. Валидация/Problem Details: nullable HTTP-контракты и безопасные domain guards; reproducer в `VehicleIntakeApiTests.cs`; полный повтор PASS.
+2. Немедленный отзыв доступа: DB revalidation JWT в `apps/api/Program.cs`; block/permission integration test PASS.
+3. Tenant integrity: composite keys/FK/checks и backfill migration в `apps/api/Infrastructure/Migrations/20260712181329_TenantIntegrityAndValidation.cs`; fresh/upgrade DB PASS.
+4. Concurrent accept: сначала усилен test `ConcurrentAndRepeatedAcceptance_PreservesSingleTransition` и получен 200+500; затем `VehicleStore.cs` начал переводить nested `40P01`/`40001` в 409; stress и два полных прогона PASS.
+5. Testcontainers stability: `AssemblyInfo.cs` запрещает assembly parallelization; `VehicleIntakeApiTests.InitializeAsync` проверяет реальное подключение `SELECT 1`; GitHub backend job PASS.
+6. Cross-platform checkout: clean clone воспроизвёл ENDOFLINE; `.gitattributes` закрепил LF; новый clean clone README PASS.
+7. Frontend recovery, incremental seed, live/ready, login rate limit/audit и production JWT key guard повторно проверены; PASS.
 
 ## 8. Безопасность и изоляция данных
 
-- **Authentication:** подпись и срок JWT проверяются; expired token отклонён; заблокированный пользователь теряет уже выданную сессию. Login rate-limited. Demo-пароли допустимы только для локального режима.
-- **Authorization:** create/accept policies реализованы сервером. Read-only пользователь получает 403 при прямом API-запросе.
-- **Tenant isolation:** `OrganizationId` не принимается на доверие от клиента; все store-запросы scoped; IDOR возвращает 404; composite FK не дают записать cross-tenant link напрямую.
-- **Филиалы:** branch принадлежит организации и входит в актуальный список доступа пользователя. Чужой филиал отклоняется сервером.
-- **Секреты:** private key/token patterns не найдены. Локальные Compose credentials и JWT key явно demo; Production с таким ключом не стартует. Для production secret manager ещё не подключён.
-- **Персональные данные:** в текущем scope только demo email и технические actor IDs; клиентские персональные данные отсутствуют. Политика retention/export/delete ещё не определена.
-- **Аудит:** создание, приём и успешный login фиксируют actor, tenant, entity, timestamp и correlation context. Защита audit trail от привилегированного администратора БД не реализована.
-- **Негативные тесты:** unauthorized, no permission, other branch, other tenant, spoofed tenant, duplicate/invalid/missing VIN, invalid money, invalid/repeated transition, concurrent update, expired/revoked session и DB outage проверены. Бронь, скидка, файлы, интеграции, фоновые задачи, архив и закрытая сделка — NOT APPLICABLE для 0.1.
+- Authentication: подпись/срок JWT проверяются; expired token и blocked user отклоняются; changed permissions/branches требуют новую сессию; login rate-limited.
+- Authorization: create/accept policies выполняются сервером; viewer получает 403 прямым API-вызовом.
+- Tenant isolation: tenant не доверяется клиенту; store scoped; IDOR даёт 404; composite FK блокируют cross-tenant links напрямую в БД.
+- Branch scope: branch принадлежит tenant и входит в актуальный access пользователя.
+- Секреты: private-key/token patterns не найдены. Compose credentials и JWT key являются локальными demo values; Production с local key не стартует.
+- Персональные данные: в 0.1 только demo email и actor IDs; политика retention/export/delete нужна до пилота.
+- Аудит: create, accept и successful login фиксируют actor, tenant, entity, timestamp и correlation ID.
+- Негативные тесты: unauthorized, no permission, other branch/tenant, spoofed tenant, duplicate/invalid/missing VIN, invalid money, invalid/repeated transition, concurrency/deadlock, expired/revoked session и DB outage — PASS. Остальные перечисленные verification prompt сценарии вне scope имеют NOT APPLICABLE.
 
 ## 9. Данные и миграции
 
-- **Создание с нуля:** каждый integration fact поднимает изолированный PostgreSQL Testcontainer и применяет миграции; все тесты прошли.
-- **Обновление существующей версии:** третья миграция применена поверх БД с двумя предыдущими миграциями и demo-данными; backfill завершён, пустых tenant keys не осталось.
-- **Ограничения:** composite tenant FK, unique `(OrganizationId, Vin)`, checks для VIN, года, пробега, суммы, валюты, статуса, version и acceptance state.
-- **Индексы:** tenant/branch/list index и уникальные/alternate keys соответствуют основным запросам первой итерации.
-- **Деньги:** `decimal` в .NET, `numeric(18,2)` в PostgreSQL; float/double не используются; отрицательные и переполненные значения отклоняются; округление покрыто boundary tests.
-- **Конкурентность:** version/concurrency token и DB unique constraint; проверены параллельные create/accept.
-- **Backup/restore:** формат custom dump успешно восстановлен во временную БД; проверены migrations/organizations/vehicles, затем временная БД удалена.
-- **Оставшийся риск:** не измерено время миграции на объёмах реального салона и не подготовлена production rollback/runbook для каждой будущей миграции.
+- Fresh DB: каждый integration fact поднимает отдельный PostgreSQL 17 Testcontainer и применяет все миграции.
+- Upgrade: третья миграция применена поверх БД с двумя предыдущими миграциями/demo data; tenant backfill завершён.
+- Constraints: tenant FK, unique `(OrganizationId, Vin)`, checks VIN/year/mileage/amount/currency/status/version/acceptance state.
+- Деньги: .NET `decimal`, PostgreSQL `numeric(19,2)`; отрицательные/overflow значения отклоняются; rounding покрыт unit tests.
+- Конкурентность: version token, unique constraints и перевод deadlock/serialization conflict в 409; автоматический повтор mutating command не выполняется.
+- Backup/restore: `pg_dump -Fc` и `pg_restore --exit-on-error` восстановили 3 migrations, 2 organizations и 7 vehicles во временной БД.
+- Остаточный риск: не измерено время миграции на объёмах реального салона и не подготовлен production rollback для будущих migrations.
 
 ## 10. Архитектура и качество кода
 
-Решение соответствует выбранному modular monolith: composition root и adapters находятся в `apps/api`, React-клиент — в `apps/web`, доменные границы — в `modules/SharedKernel`, `IdentityAccess`, `Organizations`, `Vehicles`. Vehicles не зависит от инфраструктуры или web; правила VIN, денег и перехода статуса находятся на сервере/в домене, а persistence — в API infrastructure. Удалена ненужная project dependency Vehicles -> Organizations.
+Modular monolith соответствует ADR: composition/adapters в `apps/api`, React в `apps/web`, доменные границы в `modules/SharedKernel`, `IdentityAccess`, `Organizations`, `Vehicles`. Vehicles не зависит от infrastructure/web; VIN, Money и transition находятся в domain/server. Persistence-specific PostgreSQL conflict translation находится в `apps/api/Infrastructure/VehicleStore.cs`.
 
-ADR 0001 соответствует фактической схеме: единый deployable backend, schema-per-module, явный tenant context и PostgreSQL constraints. Форматирование, build и статический scan чистые. Осознанный технический долг: один EF DbContext является composition/persistence boundary модульного монолита; при росте модулей потребуется формализовать module APIs/outbox. В текущем небольшом срезе это не нарушает границы.
+`dotnet format`, Release/Debug build, static scan и `git diff --check` чистые. Осознанный долг: единый EF DbContext является composition/persistence boundary; при росте модулей потребуются формальные module APIs/outbox.
 
 ## 11. Frontend и UX
 
-Проверены login, branch selector, intake form, client/server validation, registry, vehicle card, accept action, loading/error states, session expiry и reload persistence. Компонентные тесты покрывают happy UI и истёкшую сессию. Playwright прошёл реальный путь через nginx, API и PostgreSQL в desktop viewport и проверку формы в tablet viewport; page errors и console errors считаются падением теста.
+Проверены login, branch selector, intake form, client/server validation, registry, vehicle card, accept, loading/error states, expired session и reload persistence. Component tests: 2/2. Playwright через nginx/API/PostgreSQL: desktop happy path и tablet validation, 2/2; browser console/page errors считаются failure.
 
-Известные ограничения: только Chromium; нет отдельного Firefox/WebKit прогона, автоматического accessibility audit и ручной проверки с приёмщиком автосалона. Реестр пока без серверной пагинации/фильтров, что допустимо для demo 0.1, но обязательно до пилота на реальном объёме.
+Ограничения: только Chromium; нет Firefox/WebKit, automated accessibility audit и ручной проверки с приёмщиком. Реестр без server pagination/filtering допустим для demo, но обязателен до пилота.
 
 ## 12. Эксплуатационная готовность
 
-- **Docker:** multi-service Compose собирается и запускается; API и web доступны через документированные порты.
-- **CI:** описаны backend, frontend и e2e jobs, vulnerability scans и cleanup. Remote GitHub Actions не выполнялся, поскольку рабочее дерево ещё не закоммичено/не отправлено.
-- **Конфигурация:** обязательные env vars документированы; demo seed/migrations управляются flags; production запрещает local JWT key и auto-migration.
-- **Health:** liveness отделён от PostgreSQL readiness; поведение при остановке и восстановлении БД проверено.
-- **Логи и метрики:** structured ASP.NET logs и correlation/problem details доступны локально; централизованный сбор, SLI/SLO, dashboards и alerts отсутствуют.
-- **Backup/restore:** локальный технический drill прошёл; production schedule, encryption, retention и RPO/RTO должны быть утверждены до реальных данных.
-- **Ограничения:** не проверялись Kubernetes/cloud deployment, TLS termination, rolling update, нагрузка, хаос-тесты и production monitoring.
+- Docker: clean Compose build/start PASS; health и E2E PASS.
+- CI: [run 29209046043](https://github.com/SbKots/DealerOS/actions/runs/29209046043) на точном SHA success. Jobs: backend 1m41s, e2e 1m27s, frontend 20s. Единственная annotation — deprecation Node.js 20 runtime в `actions/checkout@v4`/setup actions, автоматически исполняемых runner на Node.js 24; это NOTE, не failure.
+- Configuration: env vars документированы; demo seed/migrations управляются flags; production запрещает local JWT key/auto-migration.
+- Health: liveness отделён от PostgreSQL readiness; DB outage/recovery проверены.
+- Logs/metrics: локальные structured logs и correlation ID есть; central logs, SLI/SLO, dashboards и alerts отсутствуют.
+- Backup/restore: технический drill PASS; production schedule, encryption, retention и RPO/RTO не утверждены.
+- Artifacts: 58 файлов, 14,452,068 bytes до добавления manifest; TRX/JUnit/HTML report/build outputs/binlog/CI JSON/checksums сохранены в указанном artifact directory. Описание: `MANIFEST.md` в этом каталоге.
 
 ## 13. Непроверенные пункты
 
 | Что не проверено | Причина | Риск | Точный следующий шаг |
 |------------------|---------|------|----------------------|
-| Удалённый GitHub Actions | Нет commit/push | Различие Linux runner и локального Windows/Docker окружения | Создать commit в `codex/**`, push и дождаться всех jobs |
-| Firefox/WebKit и accessibility | Для 0.1 настроен только Chromium | Browser-specific или a11y дефекты | Добавить Playwright projects и axe scan, выполнить ручной keyboard/screen-reader smoke |
-| Нагрузочная/длительная конкурентность | Нет согласованной пилотной нагрузки | Неизвестны latency и пределы connection pool | Зафиксировать SLO/профиль 50–1000 авто и выполнить k6-тест |
-| Production identity/TLS/secrets | В scope demo login | Нельзя безопасно открыть систему внешней сети | Подключить корпоративный IdP, secret manager, TLS и security headers; выполнить threat model |
-| Реальный backup policy/DR | Проверен только локальный drill | Не подтверждены RPO/RTO и off-site restore | Утвердить RPO/RTO, настроить encrypted scheduled backup и восстановить в отдельном окружении |
-| Usability реальных сотрудников | Нет доступа к сотрудникам в этой проверке | Процесс может не совпасть с фактической приёмкой | Провести сценарий с 2–3 приёмщиками и измерить baseline/KPI |
-| Следующие бизнес-модули | Вне итерации 0.1 | Полный lifecycle автомобиля ещё невозможен | Реализовывать следующими вертикальными срезами из backlog |
+| Firefox/WebKit/accessibility | 0.1 использует Chromium | Browser/a11y defects | Добавить Playwright projects и axe, провести keyboard/screen-reader smoke |
+| Нагрузка и длительная concurrency | Нет согласованного pilot profile | Неизвестны latency/pool limits | Утвердить SLO для 50–1000 авто и выполнить k6 test |
+| Production identity/TLS/secrets | Demo login в scope | Нельзя открывать внешней сети | IdP, secret manager, TLS, headers и threat model |
+| Production DR | Только локальный restore drill | Не подтверждены RPO/RTO | Encrypted scheduled backup и off-site restore exercise |
+| Usability сотрудников | Нет доступа к реальным ролям | Возможен process mismatch | Сессия с 2–3 приёмщиками и измерение KPI baseline |
+| Следующие lifecycle modules | Вне 0.1 | Полный lifecycle ещё невозможен | Реализовывать вертикальными срезами backlog |
 
 ## 14. Следующие действия
 
-1. **Блокирующие:** отсутствуют для демонстрации итерации 0.1.
-2. **До завершения итерации:** зафиксировать рабочее дерево commit, отправить ветку и подтвердить зелёный GitHub Actions; сохранить ссылку на immutable revision в отчёте.
-3. **До пилота:** реальный IdP/RBAC onboarding, TLS/secrets/security headers, privacy/retention policy, encrypted backup с RPO/RTO, метрики/alerts, server-side pagination и нагрузочный тест.
-4. **Следующий продуктовый срез:** осмотр, дефекты и старт подготовки после интервью с приёмщиком, диагностом и руководителем площадки.
-5. **Необязательные улучшения:** Firefox/WebKit, automated accessibility scan, pinned container digests и SBOM/signing.
+1. Блокирующие для demo итерации 0.1: отсутствуют.
+2. До пилота: real IdP/RBAC onboarding, TLS/secrets/security headers, privacy/retention, encrypted backup с RPO/RTO, metrics/alerts, pagination и load test.
+3. Следующий продуктовый срез: осмотр, дефекты и старт подготовки после интервью с приёмщиком, диагностом и руководителем площадки.
+4. Улучшения: Firefox/WebKit, accessibility scan, pinned image digests, SBOM/signing и обновление GitHub actions до runtime без deprecation annotation.
 
 ## 15. Финальное заключение
 
-- Проверяемый scope итерации 0.1 можно считать завершённым: **да**.
-- Показывать заказчику/сотрудникам автосалона: **да**, как контролируемую локальную демонстрацию первого вертикального среза.
-- Использовать реальные данные: **нет**, пока не выполнены identity, privacy, secrets/TLS, backup policy и эксплуатационный мониторинг; после этого — сначала ограниченный пилот.
-- Выпускать в production: **нет**. Итоговый вердикт относится к итерации/demo readiness, а не к production readiness полного DealerOS.
-- Условие следующего уровня готовности: immutable commit с зелёным CI, затем security/operations hardening и проверяемый пилот на согласованном объёме данных.
+- Считать scope итерации 0.1 завершённым: **да**.
+- Показывать заказчику/сотрудникам автосалона: **да**, как контролируемую demo итерацию.
+- Использовать реальные данные: **нет**, пока не выполнены identity/privacy/secrets/TLS/backup/monitoring требования; затем только ограниченный pilot.
+- Выпускать в production: **нет**. `READY WITH NOTES` означает demo-ready текущего среза, не production-ready полного DealerOS.
+- Следующий уровень готовности: security/operations hardening, проверяемый pilot и следующие vertical slices полного lifecycle.
