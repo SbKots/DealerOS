@@ -1,4 +1,5 @@
 using DealerOS.Modules.IdentityAccess;
+using DealerOS.Modules.Inspections.Domain;
 using DealerOS.Modules.Organizations;
 using DealerOS.Modules.Vehicles.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,12 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<VehicleStatusHistory> VehicleStatusHistory => Set<VehicleStatusHistory>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<InspectionTemplate> InspectionTemplates => Set<InspectionTemplate>();
+    public DbSet<InspectionTemplateItem> InspectionTemplateItems => Set<InspectionTemplateItem>();
+    public DbSet<Inspection> Inspections => Set<Inspection>();
+    public DbSet<InspectionItem> InspectionItems => Set<InspectionItem>();
+    public DbSet<InspectionDefect> InspectionDefects => Set<InspectionDefect>();
+    public DbSet<InspectionPhoto> InspectionPhotos => Set<InspectionPhoto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -77,9 +84,9 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
                 table.HasCheckConstraint("ck_vehicles_mileage", "\"MileageKm\" >= 0 AND \"MileageKm\" <= 3000000");
                 table.HasCheckConstraint("ck_vehicles_purchase_amount", "\"PlannedPurchaseAmount\" > 0");
                 table.HasCheckConstraint("ck_vehicles_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
-                table.HasCheckConstraint("ck_vehicles_status", "\"Status\" IN (1, 2)");
+                table.HasCheckConstraint("ck_vehicles_status", "\"Status\" IN (1, 2, 3, 4, 5)");
                 table.HasCheckConstraint("ck_vehicles_version", "\"Version\" > 0");
-                table.HasCheckConstraint("ck_vehicles_acceptance_state", "(\"Status\" = 1 AND \"AcceptedAt\" IS NULL AND \"StockNumber\" IS NULL) OR (\"Status\" = 2 AND \"AcceptedAt\" IS NOT NULL AND \"StockNumber\" IS NOT NULL)");
+                table.HasCheckConstraint("ck_vehicles_acceptance_state", "(\"Status\" = 1 AND \"AcceptedAt\" IS NULL AND \"StockNumber\" IS NULL) OR (\"Status\" IN (2, 3, 4, 5) AND \"AcceptedAt\" IS NOT NULL AND \"StockNumber\" IS NOT NULL)");
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
@@ -110,8 +117,8 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
         {
             entity.ToTable("status_history", "vehicles", table =>
             {
-                table.HasCheckConstraint("ck_status_history_from", "\"FromStatus\" IS NULL OR \"FromStatus\" IN (1, 2)");
-                table.HasCheckConstraint("ck_status_history_to", "\"ToStatus\" IN (1, 2)");
+                table.HasCheckConstraint("ck_status_history_from", "\"FromStatus\" IS NULL OR \"FromStatus\" IN (1, 2, 3, 4, 5)");
+                table.HasCheckConstraint("ck_status_history_to", "\"ToStatus\" IN (1, 2, 3, 4, 5)");
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
@@ -140,6 +147,167 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<UserAccount>().WithMany()
                 .HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<InspectionTemplate>(entity =>
+        {
+            entity.ToTable("templates", "inspections", table =>
+            {
+                table.HasCheckConstraint("ck_inspection_templates_version", "\"Version\" > 0");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_inspection_templates_organization_id");
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.HasIndex(x => new { x.OrganizationId, x.Version }).IsUnique()
+                .HasDatabaseName("ux_inspection_templates_organization_version");
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<InspectionTemplateItem>(entity =>
+        {
+            entity.ToTable("template_items", "inspections", table =>
+            {
+                table.HasCheckConstraint("ck_inspection_template_items_category", "\"Category\" BETWEEN 1 AND 11");
+                table.HasCheckConstraint("ck_inspection_template_items_sort", "\"SortOrder\" >= 0");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Key).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Label).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.OrganizationId, x.TemplateId, x.Key }).IsUnique()
+                .HasDatabaseName("ux_inspection_template_items_key");
+            entity.HasOne<InspectionTemplate>().WithMany(x => x.Items)
+                .HasForeignKey(x => new { x.OrganizationId, x.TemplateId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Inspection>(entity =>
+        {
+            entity.ToTable("inspections", "inspections", table =>
+            {
+                table.HasCheckConstraint("ck_inspections_status", "\"Status\" IN (1, 2, 3, 4)");
+                table.HasCheckConstraint("ck_inspections_mileage", "\"MileageKm\" BETWEEN 0 AND 3000000");
+                table.HasCheckConstraint("ck_inspections_version", "\"Version\" > 0");
+                table.HasCheckConstraint("ck_inspections_revision", "\"Revision\" > 0");
+                table.HasCheckConstraint("ck_inspections_timestamps", "(\"Status\" = 1 AND \"StartedAt\" IS NULL AND \"CompletedAt\" IS NULL) OR (\"Status\" = 2 AND \"StartedAt\" IS NOT NULL AND \"CompletedAt\" IS NULL) OR (\"Status\" = 3 AND \"StartedAt\" IS NOT NULL AND \"CompletedAt\" IS NOT NULL) OR (\"Status\" = 4 AND \"CompletedAt\" IS NULL)");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_inspections_organization_id");
+            entity.Property(x => x.TemplateName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.FinalComment).HasMaxLength(4000);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId }).IsUnique()
+                .HasFilter("\"Status\" IN (1, 2)")
+                .HasDatabaseName("ux_inspections_active_vehicle");
+            entity.HasIndex(x => new { x.OrganizationId, x.BranchId, x.Status, x.CreatedAt })
+                .HasDatabaseName("ix_inspections_tenant_branch_status_created");
+            entity.HasOne<Vehicle>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Branch>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.InspectorId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<InspectionTemplate>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.TemplateId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Inspection>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.CorrectsInspectionId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.Navigation(x => x.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.Defects).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<InspectionItem>(entity =>
+        {
+            entity.ToTable("items", "inspections", table =>
+            {
+                table.HasCheckConstraint("ck_inspection_items_category", "\"Category\" BETWEEN 1 AND 11");
+                table.HasCheckConstraint("ck_inspection_items_result", "\"Result\" IN (1, 2, 3, 4)");
+                table.HasCheckConstraint("ck_inspection_items_sort", "\"SortOrder\" >= 0");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Key).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Label).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.Comment).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.OrganizationId, x.InspectionId, x.Key }).IsUnique()
+                .HasDatabaseName("ux_inspection_items_snapshot_key");
+            entity.HasOne<Inspection>().WithMany(x => x.Items)
+                .HasForeignKey(x => new { x.OrganizationId, x.InspectionId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InspectionDefect>(entity =>
+        {
+            entity.ToTable("defects", "inspections", table =>
+            {
+                table.HasCheckConstraint("ck_inspection_defects_category", "\"Category\" BETWEEN 1 AND 11");
+                table.HasCheckConstraint("ck_inspection_defects_severity", "\"Severity\" IN (1, 2, 3)");
+                table.HasCheckConstraint("ck_inspection_defects_amount", "\"EstimatedRepairAmount\" IS NULL OR \"EstimatedRepairAmount\" >= 0");
+                table.HasCheckConstraint("ck_inspection_defects_money", "(\"EstimatedRepairAmount\" IS NULL AND \"Currency\" IS NULL) OR (\"EstimatedRepairAmount\" IS NOT NULL AND \"Currency\" ~ '^[A-Z]{3}$')");
+                table.HasCheckConstraint("ck_inspection_defects_critical", "\"Severity\" <> 3 OR (\"RepairRequired\" AND \"BlocksSale\")");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_inspection_defects_organization_id");
+            entity.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.Recommendation).HasMaxLength(4000);
+            entity.Property(x => x.EstimatedRepairAmount).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3);
+            entity.HasIndex(x => new { x.OrganizationId, x.InspectionId, x.Severity });
+            entity.HasOne<Inspection>().WithMany(x => x.Defects)
+                .HasForeignKey(x => new { x.OrganizationId, x.InspectionId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.Photos).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<InspectionPhoto>(entity =>
+        {
+            entity.ToTable("photos", "inspections", table =>
+            {
+                table.HasCheckConstraint("ck_inspection_photos_size", "\"SizeBytes\" > 0 AND \"SizeBytes\" <= 8388608");
+                table.HasCheckConstraint("ck_inspection_photos_type", "\"ContentType\" IN ('image/jpeg', 'image/png', 'image/webp')");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            entity.Property(x => x.ObjectKey).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.ContentType).HasMaxLength(50).IsRequired();
+            entity.HasIndex(x => x.ObjectKey).IsUnique().HasDatabaseName("ux_inspection_photos_object_key");
+            entity.HasOne<InspectionDefect>().WithMany(x => x.Photos)
+                .HasForeignKey(x => new { x.OrganizationId, x.DefectId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
                 .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
                 .OnDelete(DeleteBehavior.Restrict);
         });

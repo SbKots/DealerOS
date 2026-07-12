@@ -2,15 +2,14 @@
 
 ## Стиль
 
-Модульный монолит в monorepo. Модули владеют доменом и публичными application-контрактами; `apps/api` — composition root и инфраструктурные адаптеры. Одна транзакционная PostgreSQL позволяет атомарно сохранять автомобиль, историю статуса и аудит. Redis, брокер, MinIO и Kubernetes не добавлены: текущему срезу они не дают измеримой пользы.
+Модульный монолит в monorepo. Модули владеют доменом и публичными application-контрактами; `apps/api` — composition root и инфраструктурные адаптеры. PostgreSQL атомарно сохраняет доменное состояние, историю и аудит; MinIO добавлен как S3-compatible object storage для фото. Redis, брокер и Kubernetes не добавлены: текущему срезу они не дают измеримой пользы.
 
 ```text
-React/Vite -> ASP.NET Core endpoints -> VehicleIntakeService -> Vehicle aggregate
-                                             |                    |
-                                             +-> ports -----------+
-                                                   |
-                                            EF/PostgreSQL adapter
-                                            vehicles + audit + identity + organizations
+React/Vite -> ASP.NET Core command endpoints -> application services -> aggregates
+                       |                              |                 |
+                       |                              +-> ports --------+
+                       |                                    |
+                       +-> authenticated photo stream    EF/PostgreSQL + private MinIO
 ```
 
 ## Модули и владение
@@ -18,6 +17,7 @@ React/Vite -> ASP.NET Core endpoints -> VehicleIntakeService -> Vehicle aggregat
 - `IdentityAccess`: пользователи, permissions, branch access; в дальнейшем роли/сессии/MFA.
 - `Organizations`: организации и филиалы.
 - `Vehicles`: VIN, Money usage, агрегат Vehicle, переходы и use cases поступления.
+- `Inspections`: версионные шаблоны, агрегат Inspection, пункты, дефекты, метаданные фото и команды lifecycle.
 - `SharedKernel`: только стабильные малые понятия и типы ошибок.
 - `apps/api/Infrastructure`: EF mappings по схемам `identity`, `organizations`, `vehicles`, `audit`; это адаптер, а не место бизнес-правил.
 
@@ -31,9 +31,19 @@ JWT содержит `org_id`, `branch_id`, `permission`; request body не со
 
 ```text
 IntakeDraft -- accept-to-stock (обязательные данные + право + доступ к филиалу) --> InStock
+InStock -- start inspection --> InspectionInProgress
+InspectionInProgress -- complete(no blocking defects) --> ReadyForSale
+InspectionInProgress -- complete(repair/blocking defects) --> ReconditioningRequired
+InspectionInProgress -- cancel --> InStock
 ```
 
 Повторный переход запрещён доменом. Универсального PATCH статуса нет. Каждое создание/принятие создаёт status history и audit event в одном `SaveChanges`.
+
+## Осмотры и файлы
+
+Partial unique index в PostgreSQL разрешает один Draft/InProgress на автомобиль. `Version` защищает команды; повтор complete идемпотентен. Завершённая ревизия не изменяется; correction создаёт новый Inspection со ссылкой на источник.
+
+Файл до 8 МБ декодируется SkiaSharp, ограничивается 25 MP, перекодируется в JPEG/PNG/WebP и теряет исходные metadata. Ключ генерирует сервер с tenant prefix. Bucket приватен; скачивание идёт через permission-checked API, без public/presigned URL. Если запись метаданных не удалась, object удаляется компенсирующей операцией; нависшие multipart uploads не используются.
 
 ## Данные
 

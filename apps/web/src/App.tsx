@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { api, ApiError, clearSession, getSession, hasSession, saveSession, sessionExpiredEvent, type Session } from './api'
+import { InspectionsWorkspace } from './Inspections'
 import './App.css'
 
 const intakeSchema = z.object({
@@ -22,7 +23,7 @@ type IntakeForm = z.output<typeof intakeSchema>
 export type Branch = { id: string; code: string; name: string }
 export type Vehicle = {
   id: string; branchId: string; branchName: string; vin: string; make: string; model: string; year: number
-  mileageKm: number; plannedPurchaseAmount: number; currency: string; status: 'IntakeDraft' | 'InStock'
+  mileageKm: number; plannedPurchaseAmount: number; currency: string; status: 'IntakeDraft' | 'InStock' | 'InspectionInProgress' | 'ReconditioningRequired' | 'ReadyForSale'
   stockNumber?: string; createdAt: string; acceptedAt?: string; version: number
 }
 
@@ -34,6 +35,8 @@ export default function App() {
   const queryClient = useQueryClient()
   const [authenticated, setAuthenticated] = useState(hasSession())
   const [selected, setSelected] = useState<Vehicle | null>(null)
+  const [view, setView] = useState<'intake' | 'inspections'>('intake')
+  const [inspectionVehicle, setInspectionVehicle] = useState<Vehicle | null>(null)
   const [email, setEmail] = useState('admin@volga-auto.demo')
   const [password, setPassword] = useState('DealerOS!2026')
 
@@ -101,11 +104,16 @@ export default function App() {
   return <div className="app-shell">
     <header>
       <div className="brand"><span className="brand-mark">D</span><span>DealerOS</span></div>
+      <nav className="main-nav" aria-label="Разделы">
+        <button className={view === 'intake' ? 'active' : ''} onClick={() => setView('intake')}>Приёмка</button>
+        <button className={view === 'inspections' ? 'active' : ''} onClick={() => { setInspectionVehicle(null); setView('inspections') }}>Осмотры</button>
+      </nav>
       <div className="context-pill"><span className="pulse" />{session?.organizationName} · {session?.branchName}</div>
       <button className="link-button" onClick={() => { clearSession(); setAuthenticated(false); queryClient.clear() }}>Выйти</button>
     </header>
 
     <main className="workspace">
+      {view === 'inspections' ? <InspectionsWorkspace focusVehicle={inspectionVehicle} onClearFocus={() => setInspectionVehicle(null)} /> : <>
       <div className="page-heading">
         <div><p className="eyebrow">Склад автомобилей</p><h1>Приём автомобиля</h1><p className="muted">Создайте цифровой паспорт, затем подтвердите фактическую приёмку на площадку.</p></div>
         <div className="metric"><span>На контроле</span><strong>{vehicles.data?.filter((x) => x.status === 'IntakeDraft').length ?? 0}</strong><small>черновиков поступления</small></div>
@@ -135,7 +143,7 @@ export default function App() {
 
         <section className="panel vehicle-panel">
           <div className="panel-title"><span className="step">02</span><div><h2>Карточка автомобиля</h2><p>Проверка перед фактической приёмкой.</p></div></div>
-          {!currentVehicle ? <div className="empty-state"><div className="car-outline">◇</div><strong>Карточка появится здесь</strong><p>Заполните обязательные поля поступления слева.</p></div> : <VehicleCard vehicle={currentVehicle} accepting={acceptVehicle.isPending} onAccept={() => acceptVehicle.mutate(currentVehicle.id)} error={acceptVehicle.error} />}
+          {!currentVehicle ? <div className="empty-state"><div className="car-outline">◇</div><strong>Карточка появится здесь</strong><p>Заполните обязательные поля поступления слева.</p></div> : <VehicleCard vehicle={currentVehicle} accepting={acceptVehicle.isPending} onAccept={() => acceptVehicle.mutate(currentVehicle.id)} onOpenInspections={() => { setInspectionVehicle(currentVehicle); setView('inspections') }} error={acceptVehicle.error} />}
         </section>
       </div>
 
@@ -145,23 +153,25 @@ export default function App() {
           {vehicles.data?.map((vehicle) => <tr key={vehicle.id} onClick={() => setSelected(vehicle)}><td><strong>{vehicle.make} {vehicle.model}</strong><small>{vehicle.year} · {vehicle.mileageKm.toLocaleString('ru-RU')} км</small></td><td className="mono">{vehicle.vin}</td><td>{vehicle.branchName}</td><td>{vehicle.plannedPurchaseAmount.toLocaleString('ru-RU')} ₽</td><td><Status status={vehicle.status} /></td></tr>)}
         </tbody></table></div>}
       </section>
+      </>}
     </main>
   </div>
 }
 
-function VehicleCard({ vehicle, accepting, onAccept, error }: { vehicle: Vehicle; accepting: boolean; onAccept: () => void; error: unknown }) {
+function VehicleCard({ vehicle, accepting, onAccept, onOpenInspections, error }: { vehicle: Vehicle; accepting: boolean; onAccept: () => void; onOpenInspections: () => void; error: unknown }) {
   return <div className="vehicle-card">
     <div className="vehicle-card-top"><Status status={vehicle.status} /><span className="mono">{vehicle.stockNumber ?? 'Номер после приёмки'}</span></div>
     <h3>{vehicle.make} {vehicle.model}</h3><p className="vin mono">{vehicle.vin}</p>
     <dl><div><dt>Год</dt><dd>{vehicle.year}</dd></div><div><dt>Пробег</dt><dd>{vehicle.mileageKm.toLocaleString('ru-RU')} км</dd></div><div><dt>Закупка</dt><dd>{vehicle.plannedPurchaseAmount.toLocaleString('ru-RU')} ₽</dd></div><div><dt>Филиал</dt><dd>{vehicle.branchName}</dd></div></dl>
     <div className="rule-check"><span>✓</span><p><strong>Обязательные данные проверены сервером</strong><small>VIN уникален в организации, филиал доступен сотруднику.</small></p></div>
     {error ? <div className="error-banner" role="alert">{errorText(error)}</div> : null}
-    {vehicle.status === 'IntakeDraft' ? <button className="accept-button" onClick={onAccept} disabled={accepting}>{accepting ? 'Принимаем…' : 'Принять на склад'}<span>→</span></button> : <div className="success-banner" role="status"><span>✓</span><div><strong>Автомобиль принят на склад</strong><small>{vehicle.stockNumber}</small></div></div>}
+    {vehicle.status === 'IntakeDraft' ? <button className="accept-button" onClick={onAccept} disabled={accepting}>{accepting ? 'Принимаем…' : 'Принять на склад'}<span>→</span></button> : <><div className="success-banner" role="status"><span>✓</span><div><strong>{vehicle.status === 'InStock' ? 'Автомобиль принят на склад' : 'Автомобиль в работе'}</strong><small>{vehicle.stockNumber}</small></div></div><button className="tab-button" onClick={onOpenInspections}>Осмотры →</button></>}
   </div>
 }
 
 function Status({ status }: { status: Vehicle['status'] }) {
-  return <span className={`status ${status === 'InStock' ? 'success' : 'draft'}`}><i />{status === 'InStock' ? 'На складе' : 'Черновик'}</span>
+  const labels: Record<Vehicle['status'], string> = { IntakeDraft: 'Черновик', InStock: 'На складе', InspectionInProgress: 'На осмотре', ReconditioningRequired: 'Нужна подготовка', ReadyForSale: 'Готов к продаже' }
+  return <span className={`status ${status === 'IntakeDraft' ? 'draft' : 'success'}`}><i />{labels[status]}</span>
 }
 
 function FieldError({ message }: { message?: string }) { return message ? <span className="field-error">{message}</span> : null }

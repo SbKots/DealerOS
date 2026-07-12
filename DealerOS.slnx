@@ -7,6 +7,9 @@
   <Folder Name="/modules/IdentityAccess/">
     <Project Path="modules/IdentityAccess/DealerOS.Modules.IdentityAccess.csproj" />
   </Folder>
+  <Folder Name="/modules/Inspections/">
+    <Project Path="modules/Inspections/DealerOS.Modules.Inspections.csproj" />
+  </Folder>
   <Folder Name="/modules/Organizations/">
     <Project Path="modules/Organizations/DealerOS.Modules.Organizations.csproj" />
   </Folder>

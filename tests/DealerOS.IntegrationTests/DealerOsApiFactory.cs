@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DealerOS.IntegrationTests;
 
-public sealed class DealerOsApiFactory(string connectionString) : WebApplicationFactory<Program>
+public sealed class DealerOsApiFactory(string connectionString, string? objectStorageEndpoint = null) : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -19,7 +19,13 @@ public sealed class DealerOsApiFactory(string connectionString) : WebApplication
             ["Database:SeedDemo"] = "true",
             ["Jwt:Issuer"] = "DealerOS.Tests",
             ["Jwt:Audience"] = "DealerOS.Tests",
-            ["Jwt:Key"] = "integration-test-signing-key-with-at-least-32-characters"
+            ["Jwt:Key"] = "integration-test-signing-key-with-at-least-32-characters",
+            ["ObjectStorage:Endpoint"] = objectStorageEndpoint ?? "localhost:9000",
+            ["ObjectStorage:AccessKey"] = "dealer-test",
+            ["ObjectStorage:SecretKey"] = "dealer-test-secret",
+            ["ObjectStorage:Bucket"] = "dealeros-tests",
+            ["ObjectStorage:UseSsl"] = "false",
+            ["ObjectStorage:EnsureBucket"] = objectStorageEndpoint is null ? "false" : "true"
         }));
     }
 

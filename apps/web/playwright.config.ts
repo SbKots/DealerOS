@@ -4,5 +4,5 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   use: { baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:4173', trace: 'retain-on-failure' },
-  reporter: [['list']],
+  reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
 })

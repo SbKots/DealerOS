@@ -1,6 +1,6 @@
 # DealerOS
 
-DealerOS — операционная система среднего автосалона автомобилей с пробегом. Текущая итерация реализует первый законченный вертикальный срез: авторизованный сотрудник создаёт поступление автомобиля и принимает его на склад с tenant isolation, проверкой филиала, контролируемым статусом и аудитом.
+DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.2 продолжает приёмку сквозным осмотром: очередь InStock, версионный чек-лист, дефекты, защищённые фотографии в MinIO, неизменяемый результат, аудит и tenant/branch isolation.
 
 ## Быстрый запуск
 
@@ -19,11 +19,13 @@ docker compose up --build
 
 Пользователь только для чтения: `viewer@volga-auto.demo`, пароль тот же. Его JWT не содержит permissions создания и приёмки автомобиля.
 
+Демо-диагност: `inspector@volga-auto.demo`, пароль тот же. MinIO Console: `http://localhost:9001`, локальные credentials заданы только в `compose.yaml`.
+
 Остановить окружение: `docker compose down`. Удалить только локальные демонстрационные данные: `docker compose down -v`.
 
 ## Локальная разработка
 
-1. Поднять PostgreSQL: `docker compose up postgres -d`.
+1. Поднять PostgreSQL и MinIO: `docker compose up postgres minio -d`.
 2. В одном терминале: `dotnet run --project apps/api`.
 3. В другом: `cd apps/web; npm ci; npm run dev`.
 
@@ -35,8 +37,10 @@ API в Development применяет миграции и идемпотентн
 - `Jwt__Key` — ключ подписи JWT; production не запустится с локальным ключом;
 - `Database__ApplyMigrations` — автоматические миграции, только для Development/тестов;
 - `Database__SeedDemo` — демонстрационные организации и пользователи.
+- `ObjectStorage__Endpoint`, `AccessKey`, `SecretKey`, `Bucket`, `UseSsl` — приватное S3-compatible хранилище фотографий;
+- `ObjectStorage__EnsureBucket` — создание bucket при старте только для Development/тестов.
 
-Диагностика: `/health/live` проверяет процесс, `/health/ready` — готовность PostgreSQL, `/health` сохранён как совмещённая проверка.
+Диагностика: `/health/live` проверяет процесс, `/health/ready` — PostgreSQL и object storage, `/health` сохранён как совмещённая проверка.
 
 ## Проверки
 
@@ -59,7 +63,7 @@ Integration tests используют настоящий PostgreSQL в Testcont
 
 - `apps/api` — composition root, HTTP API, EF Core, JWT, миграции и адаптеры;
 - `apps/web` — React/TypeScript интерфейс и Playwright e2e;
-- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles;
+- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles и Inspections;
 - `tests` — backend unit и PostgreSQL integration tests;
 - `docs` — продукт, архитектура, решения, безопасность, demo и backlog;
 - `compose.yaml` — воспроизводимое локальное окружение;

@@ -17,6 +17,23 @@ services:
       timeout: 3s
       retries: 20
 
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: dealer-test
+      MINIO_ROOT_PASSWORD: dealer-test-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - dealeros-minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
   api:
     build:
       context: .
@@ -28,10 +45,18 @@ services:
       Database__ApplyMigrations: "true"
       Database__SeedDemo: "true"
       Jwt__Key: local-compose-only-change-before-deployment-DealerOS-2026
+      ObjectStorage__Endpoint: minio:9000
+      ObjectStorage__AccessKey: dealer-test
+      ObjectStorage__SecretKey: dealer-test-secret
+      ObjectStorage__Bucket: dealeros-private
+      ObjectStorage__UseSsl: "false"
+      ObjectStorage__EnsureBucket: "true"
     ports:
       - "5080:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   web:
@@ -45,3 +70,4 @@ services:
 
 volumes:
   dealeros-postgres:
+  dealeros-minio:
