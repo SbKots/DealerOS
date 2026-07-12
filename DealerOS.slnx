@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/apps/" />
+  <Folder Name="/apps/api/">
+    <Project Path="apps/api/DealerOS.Api.csproj" />
+  </Folder>
+  <Folder Name="/modules/" />
+  <Folder Name="/modules/IdentityAccess/">
+    <Project Path="modules/IdentityAccess/DealerOS.Modules.IdentityAccess.csproj" />
+  </Folder>
+  <Folder Name="/modules/Organizations/">
+    <Project Path="modules/Organizations/DealerOS.Modules.Organizations.csproj" />
+  </Folder>
+  <Folder Name="/modules/SharedKernel/">
+    <Project Path="modules/SharedKernel/DealerOS.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/modules/Vehicles/">
+    <Project Path="modules/Vehicles/DealerOS.Modules.Vehicles.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DealerOS.IntegrationTests/DealerOS.IntegrationTests.csproj" />
+    <Project Path="tests/DealerOS.UnitTests/DealerOS.UnitTests.csproj" />
+  </Folder>
+</Solution>
