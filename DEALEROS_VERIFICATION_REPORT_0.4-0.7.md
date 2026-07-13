@@ -2,7 +2,7 @@
 
 ## Verdict
 
-**NOT READY — ожидаются clean-clone и GitHub Actions.** Локальные backend, frontend, PostgreSQL/MinIO integration, migration и Playwright gates зелёные. Открытых BLOCKER, CRITICAL и относящихся к scope MAJOR после локальной проверки нет. До подтверждения чистого клона и CI разрешён только Draft PR.
+**READY WITH NOTES.** Локальные backend, frontend, PostgreSQL/MinIO integration, migration и Playwright gates зелёные; clean clone проверен; GitHub Actions run `29280088290` завершился успешно. Открытых BLOCKER, CRITICAL и относящихся к scope MAJOR нет. Evidence-only commit, содержащий фактические CI-ссылки в этом отчёте, также должен получить зелёный CI до перевода Draft PR в Ready и merge.
 
 Версия предназначена только для локальной демонстрации и product discovery. Она не является production-ready и не должна использовать реальные персональные или финансовые данные.
 
@@ -18,7 +18,8 @@
 | 0.7 checkpoint | `6f915b862844e55bac02db2e5e308ddbc479182f` |
 | Verification fixes | `8bca805a84c844fb33e9db6823419dd07df68414` |
 | Локально проверенный product HEAD | `8bca805a84c844fb33e9db6823419dd07df68414` |
-| Final PR HEAD | Ожидается после evidence-only commit |
+| Проверенный PR HEAD до evidence-only update | `8a9738dad9b49ffd87ee9716f9f679ee2733ca1b` |
+| Final PR HEAD | Evidence-only commit, содержащий текущую версию отчёта; точный SHA фиксируется в PR #5 и итоговом handoff |
 
 В ancestry также подтверждены обязательные product/fix commits `dbc714b4c0690f00a2819c2e63f0ea723e3aec76`, `38aa9302da6649fd06294230540b8f5bbab37e62` и `c9b2981b8ba026fbba37fa54d1d2661979ac4827`.
 
@@ -174,18 +175,27 @@ Fresh: 10 migrations, 2 organizations, 6 users, 2 vehicles, 1 customer и 1 lead
 ## Security и diff hygiene
 
 - `git diff --check origin/master...HEAD` — PASS.
-- Diff: 79 файлов и 5 commits до evidence-only report commit.
+- Diff: 80 файлов и 6 commits на проверенном PR HEAD `8a9738dad9b49ffd87ee9716f9f679ee2733ca1b`.
 - В diff нет `.env`, private keys, certificates, access tokens, `bin`, `obj`, `dist`, `TestResults`, `test-results`, `playwright-report` или бинарных файлов.
 - Наибольшие файлы — генерируемые EF migration designers/model snapshot; случайных дампов и крупных бинарников нет.
 - PostgreSQL и MinIO demo volumes не удалялись.
 
 ## Clean clone
 
-PENDING. Будет выполнен строго по `README.md` на evidence commit, включающем код, verification fixes и этот report.
+PASS на exact SHA `8a9738dad9b49ffd87ee9716f9f679ee2733ca1b`, включающем код, verification fixes и первоначальную версию этого report. Выполнен `git clone --no-local`, detached checkout exact SHA и затем строго команды `README.md`: `docker compose up --build -d`, health `web=200`/`api ready=200`, backend restore/format/build/test, frontend `npm ci`/lint/test/build и `npm run test:e2e`. Результат: build 0 warnings/0 errors, 46/46 unit, 25/25 integration, 22/22 frontend, 5/5 Playwright. После проверки Compose остановлен без `-v`, временный clone удалён, постоянные `dealeros_dealeros-postgres` и `dealeros_dealeros-minio` volumes сохранены.
 
 ## GitHub Actions
 
-PENDING. Draft PR не будет переведён в Ready и не будет merged до зелёных backend, frontend и e2e jobs, опубликованных artifacts и отсутствия unresolved review threads.
+[CI run 29280088290](https://github.com/SbKots/DealerOS/actions/runs/29280088290), run #37, exact SHA `8a9738dad9b49ffd87ee9716f9f679ee2733ca1b`: backend SUCCESS, frontend SUCCESS, e2e SUCCESS.
+
+Опубликованы и не просрочены:
+
+- `backend-test-results`, artifact `8290983154`, SHA-256 `ed026d866518a64855fd19ff6808921c8252970fd9b482c855b4147d0a8b372f`;
+- `frontend-test-results`, artifact `8290935574`, SHA-256 `231516b0740b0730631788f39e41bc33c4c4d05cc58693c195d61351cb80492f`;
+- `frontend-build`, artifact `8290936130`, SHA-256 `201d96549099878f2794c142fe4bcd9b7630df8794d8a16a01ce9406dc557d84`;
+- `playwright-report`, artifact `8290980068`, SHA-256 `58304b080760a46f26e097e1f3dafc2442a920bd322e0d498d0682bd1ab79b18`.
+
+Draft PR #5 остаётся Draft до зелёного повторного CI evidence-only commit и проверки mergeability/review threads.
 
 ## Сознательно отложено до 0.8–1.0
 
