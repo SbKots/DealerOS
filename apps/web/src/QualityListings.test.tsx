@@ -44,4 +44,27 @@ describe('QualityListingsWorkspace', () => {
     expect(await screen.findByLabelText('Публичная цена')).toBeDisabled()
     expect(screen.getByText('demo-channel').closest('p')).toHaveTextContent('Published')
   })
+
+  it('downloads private media with the authenticated API instead of an unprotected image request', async () => {
+    const vehicle = { id: '20000000-0000-4000-8000-000000000002', branchId: '60000000-0000-4000-8000-000000000001', branchName: 'Центр', vin: 'XTA210990Y2765433', make: 'Lada', model: 'XRAY', year: 2023, mileageKm: 21000, plannedPurchaseAmount: 900000, currency: 'RUB', status: 'ReadyForSale', createdAt: '2026-07-14T10:00:00Z', version: 5 }
+    const media = { id: '90000000-0000-4000-8000-000000000001', vehicleId: vehicle.id, category: 'Exterior', originalFileName: 'exterior.png', sortOrder: 10, isCover: true, version: 1, downloadUrl: '/api/vehicle-media/90000000-0000-4000-8000-000000000001/download' }
+    let authorization: string | null = null
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:private-media') })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input)
+      if (url.endsWith('/api/vehicles')) return Response.json([vehicle])
+      if (url.endsWith(`/api/vehicles/${vehicle.id}/media`)) return Response.json([media])
+      if (url.endsWith(`/api/vehicles/${vehicle.id}/listing`)) return Response.json(null)
+      if (url.endsWith(media.downloadUrl)) {
+        authorization = new Headers(init?.headers).get('Authorization')
+        return new Response(new Blob(['image'], { type: 'image/png' }), { headers: { 'Content-Type': 'image/png' } })
+      }
+      throw new Error(`Unexpected ${url}`)
+    })
+    setup(['listings.view'])
+    await userEvent.click(await screen.findByRole('button', { name: 'Подготовить объявление' }))
+    expect(await screen.findByRole('img', { name: 'exterior.png' })).toHaveAttribute('src', 'blob:private-media')
+    expect(authorization).toBe('Bearer token')
+  })
 })

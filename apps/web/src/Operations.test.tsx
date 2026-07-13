@@ -44,4 +44,26 @@ describe('OperationsWorkspace', () => {
     await waitFor(() => expect(screen.getByText('Execution · InProgress')).toBeInTheDocument())
     expect(fetch).toHaveBeenLastCalledWith(expect.stringContaining('/start'), expect.objectContaining({ body: JSON.stringify({ expectedVersion: 1 }) }))
   })
+
+  it('locks work inputs while a server command is pending', async () => {
+    const started = { ...execution, status: 'InProgress', version: 2 }
+    let resolveStart!: (response: Response) => void
+    const startResponse = new Promise<Response>((resolve) => { resolveStart = resolve })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input)
+      if (url.endsWith('/api/reconditioning-plans/required-vehicles')) return Response.json([{ vehicleId: execution.vehicleId, branchName: 'Центр', vin: 'XTA210990Y2765432', make: 'Lada', model: 'Vesta', inspectionCompletedAt: '2026-07-13T10:00:00Z', mandatoryDefectCount: 1, latestPlanId: execution.planId, latestPlanStatus: 'Approved', latestPlanRevision: 1 }])
+      if (url.endsWith('/api/operations/executions')) return Response.json(execution)
+      if (url.endsWith(`/api/operations/executions/${execution.id}/start`) && init?.method === 'POST') return startResponse
+      throw new Error(`Unexpected ${url}`)
+    })
+    setup()
+    await userEvent.click(await screen.findByRole('button', { name: 'Открыть выполнение' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Начать выполнение' }))
+    const actual = screen.getByRole('spinbutton', { name: `Факт работы: ${execution.workOrders[0].title}` })
+    await waitFor(() => expect(actual).toBeDisabled())
+
+    resolveStart(Response.json(started))
+
+    await waitFor(() => expect(screen.getByRole('spinbutton', { name: `Факт работы: ${execution.workOrders[0].title}` })).toBeEnabled())
+  })
 })

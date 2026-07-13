@@ -47,7 +47,8 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     if (response.status === 401 && options.authenticated !== false) expireSession()
     throw new ApiError(problem.title ?? `Ошибка HTTP ${response.status}`, response.status, problem.code)
   }
-  return response.json() as Promise<T>
+  const text = await response.text()
+  return (text ? JSON.parse(text) : null) as T
 }
 
 export async function apiForm<T>(path: string, body: FormData): Promise<T> {

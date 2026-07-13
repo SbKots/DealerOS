@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { api, apiForm, ApiError, getSession } from './api'
+import { api, apiBlob, apiForm, ApiError, getSession } from './api'
 import type { Vehicle } from './App'
 
 type QueueWork = { id: string; sourceDefectId: string; title: string }
@@ -63,12 +63,35 @@ function ListingWorkspace() {
   return <section className="panel"><div className="panel-title"><span className="step">06</span><div><h2>Media, Content Pack и Listing Ready</h2><p>Приватные оригиналы; в snapshot не попадают документы категории internal.</p></div></div>
     {(create.error || update.error || command.error) && <div className="error-banner" role="alert">{errorText(create.error ?? update.error ?? command.error)}</div>}
     {!vehicle ? ready.length ? <div className="queue-grid">{ready.map((item) => <article className="queue-card" key={item.id}><span className="status success"><i />ReadyForSale</span><h3>{item.make} {item.model}</h3><p className="mono">{item.vin}</p><button className="primary" onClick={() => setVehicle(item)}>Подготовить объявление</button></article>)}</div> : <div className="empty-state"><strong>Нет ReadyForSale</strong><p>Автомобиль появится после успешного QC.</p></div> : <div><button className="link-button" onClick={() => { setVehicle(null); setListing(null) }}>← К автомобилям</button><h3>{vehicle.make} {vehicle.model}</h3>
-      <div className="media-grid">{media.data?.map((item) => <article className="media-card" key={item.id}><img src={item.downloadUrl} alt={item.originalFileName} /><strong>{item.category}{item.isCover ? ' · Обложка' : ''}</strong>{!item.isCover && item.category !== 'DocumentsInternal' && <button className="secondary" onClick={() => api<Media>(`/api/vehicles/${vehicle.id}/media/${item.id}/cover`, { method: 'POST', body: { expectedVersion: item.version } }).then(() => client.invalidateQueries({ queryKey: ['vehicle-media', vehicle.id] }))}>Сделать обложкой</button>}</article>)}</div>
+      <div className="media-grid">{media.data?.map((item) => <article className="media-card" key={item.id}><PrivateImage media={item} /><strong>{item.category}{item.isCover ? ' · Обложка' : ''}</strong>{!item.isCover && item.category !== 'DocumentsInternal' && <button className="secondary" onClick={() => api<Media>(`/api/vehicles/${vehicle.id}/media/${item.id}/cover`, { method: 'POST', body: { expectedVersion: item.version } }).then(() => client.invalidateQueries({ queryKey: ['vehicle-media', vehicle.id] }))}>Сделать обложкой</button>}</article>)}</div>
       <div className="work-form">{['Exterior', 'Interior', 'DamageHistory', 'DocumentsInternal'].map((category) => <label key={category}>{category}<input aria-label={`Фото ${category}`} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => e.target.files?.[0] && upload(category, e.target.files[0])} /></label>)}</div>
       {!listing ? <button className="primary" disabled={create.isPending} onClick={() => create.mutate()}>Создать Content Pack</button> : <><span className="status draft"><i />Listing {listing.status}</span><div className="work-form"><label>Комплектация<textarea aria-label="Комплектация" disabled={listing.status === 'Ready'} value={draft.equipment} onChange={(e) => setDraft({ ...draft, equipment: e.target.value })} /></label><label>Преимущества<textarea aria-label="Преимущества" disabled={listing.status === 'Ready'} value={draft.advantages} onChange={(e) => setDraft({ ...draft, advantages: e.target.value })} /></label><label className="wide">Состояние<textarea aria-label="Описание состояния" disabled={listing.status === 'Ready'} value={draft.conditionDescription} onChange={(e) => setDraft({ ...draft, conditionDescription: e.target.value })} /></label><label>Публичная цена<input aria-label="Публичная цена" type="number" disabled={listing.status === 'Ready'} value={draft.publicPriceAmount} onChange={(e) => setDraft({ ...draft, publicPriceAmount: Number(e.target.value) })} /></label></div>
         {listing.status === 'Draft' ? <div className="work-actions"><button className="secondary" onClick={() => update.mutate()}>Сохранить Content Pack</button><button className="primary" onClick={() => command.mutate({ action: 'ready', body: { commandId: crypto.randomUUID(), expectedVersion: listing.version } })}>Проверить и сделать Listing Ready</button></div> : <><div className="work-actions"><label>Канал<input aria-label="Канал публикации" value={channel} onChange={(e) => setChannel(e.target.value)} /></label><button className="secondary" onClick={doExport}>Manual export JSON</button><button className="primary" onClick={() => command.mutate({ action: 'publish', body: { commandId: crypto.randomUUID(), channel, externalId: 'MANUAL', externalUrl: null } })}>Подтвердить Published вручную</button></div>{exportPayload && <pre className="snapshot-preview">{JSON.stringify(JSON.parse(exportPayload), null, 2)}</pre>}{listing.publications.map((x) => <p className="history-item" key={x.id}><strong>{x.channel}</strong> · {x.status}</p>)}</>}
       </>}</div>}
   </section>
+}
+
+function PrivateImage({ media }: { media: Media }) {
+  const [objectUrl, setObjectUrl] = useState('')
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let active = true
+    let createdUrl = ''
+    setObjectUrl('')
+    setFailed(false)
+    apiBlob(media.downloadUrl).then((blob) => {
+      if (!active) return
+      createdUrl = URL.createObjectURL(blob)
+      setObjectUrl(createdUrl)
+    }).catch(() => { if (active) setFailed(true) })
+    return () => {
+      active = false
+      if (createdUrl) URL.revokeObjectURL(createdUrl)
+    }
+  }, [media.downloadUrl])
+  if (failed) return <div className="photo-placeholder" role="img" aria-label={`${media.originalFileName}: ошибка загрузки`}>Ошибка</div>
+  if (!objectUrl) return <div className="photo-placeholder" role="status">Загрузка…</div>
+  return <img src={objectUrl} alt={media.originalFileName} />
 }
 
 function money(value: number, currency: string) { return new Intl.NumberFormat('ru-RU', { style: 'currency', currency }).format(value) }
