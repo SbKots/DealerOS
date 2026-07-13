@@ -6,14 +6,16 @@
 
 ## Проверенная версия
 
-- branch: `codex/reconditioning-plan-0.3`;
-- base `origin/master`: `3a3ed8b2d98e743beec2d8ca819acbf9c7740b37`;
+- product branch: `codex/reconditioning-plan-0.3`;
+- final fixture verification branch: `codex/reconditioning-fixture-readiness`;
+- iteration base `origin/master`: `3a3ed8b2d98e743beec2d8ca819acbf9c7740b37`;
+- follow-up base (0.3 merge commit): `d685b01c00f952cfd139142329c2e7d2a8980a92`;
 - product commit: `38aa9302da6649fd06294230540b8f5bbab37e62`;
 - shared PostgreSQL fixture commit: `e3affb819660584304f7cb1fce16be1272084549`;
-- финальный test-only fixture/runner/diagnostics HEAD: `986c4be9ef53be41737b775c068e5fb3f993c185`;
-- проверенный code HEAD: `986c4be9ef53be41737b775c068e5fb3f993c185`;
+- финальный test-only fixture readiness fix: `c9b2981b8ba026fbba37fa54d1d2661979ac4827`;
+- проверенный code HEAD: `c9b2981b8ba026fbba37fa54d1d2661979ac4827`;
 - product commit присутствует в ancestry проверенного HEAD;
-- успешный GitHub Actions run: [29260829492](https://github.com/SbKots/DealerOS/actions/runs/29260829492).
+- успешный GitHub Actions run: [29262678847](https://github.com/SbKots/DealerOS/actions/runs/29262678847).
 
 ## Проверенный вертикальный сценарий
 
@@ -48,12 +50,12 @@ dotnet test DealerOS.slnx -c Release --no-build --logger trx --results-directory
 ### Два обязательных integration-прогона после fixture fix
 
 ```powershell
-dotnet test tests/DealerOS.IntegrationTests/DealerOS.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=integration-fixture-final-run-1.trx" --results-directory TestResults/integration-fixture-final-run-1
-dotnet test tests/DealerOS.IntegrationTests/DealerOS.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=integration-fixture-final-run-2.trx" --results-directory TestResults/integration-fixture-final-run-2
+dotnet test tests/DealerOS.IntegrationTests/DealerOS.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=integration-readiness-run-1.trx" --results-directory TestResults/integration-readiness-run-1
+dotnet test tests/DealerOS.IntegrationTests/DealerOS.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=integration-readiness-run-2.trx" --results-directory TestResults/integration-readiness-run-2
 ```
 
-- run 1: 21/21 passed, 1 min 44 sec;
-- run 2: 21/21 passed, 1 min 42 sec.
+- run 1: 21/21 passed, 1 min 53 sec;
+- run 2: 21/21 passed, 1 min 47 sec.
 
 ### Способ очистки PostgreSQL между тестами
 
@@ -163,28 +165,29 @@ docker compose up --build
 - integration assembly runner config commit: `79a93897e243528d60f73f964b1ca1fcbb3f6cef`;
 - VSTest adapter compatibility commit: `ed6647e905963a27772a8b639fa65c70c726f186`;
 - bounded container diagnostics commits: `94481a454eb593e25352ac91fc491803f21abc4c` и `986c4be9ef53be41737b775c068e5fb3f993c185`;
-- исправление: один collection fixture на класс, lease на полное тело каждого теста, полное пересоздание target database перед каждым тестом и явная последовательная конфигурация только integration test assembly;
-- успешный повторный run: [29260829492](https://github.com/SbKots/DealerOS/actions/runs/29260829492).
+- послемержевый reproducer bootstrap race: [29262076161](https://github.com/SbKots/DealerOS/actions/runs/29262076161) — `State=Running`, но первое Npgsql-соединение было сброшено во время перехода official PostgreSQL entrypoint от временного initdb server к основному server;
+- финальный readiness fix: `c9b2981b8ba026fbba37fa54d1d2661979ac4827` удаляет custom Unix-socket `pg_isready` и использует встроенную стратегию `Testcontainers.PostgreSql`, которая проверяет TCP `localhost`, целевую БД и пользователя после initdb;
+- исправление: один collection fixture на класс, lease на полное тело каждого теста, полное пересоздание target database перед каждым тестом, штатная PostgreSQL module readiness и явная последовательная конфигурация только integration test assembly;
+- успешный повторный run: [29262678847](https://github.com/SbKots/DealerOS/actions/runs/29262678847).
 
 Открытых BLOCKER, CRITICAL и MAJOR после исправлений нет.
 
 ## GitHub Actions и artifacts
 
-Run [29260829492](https://github.com/SbKots/DealerOS/actions/runs/29260829492) на SHA `986c4be9ef53be41737b775c068e5fb3f993c185`:
+Run [29262678847](https://github.com/SbKots/DealerOS/actions/runs/29262678847) на SHA `c9b2981b8ba026fbba37fa54d1d2661979ac4827`:
 
 - backend — success: format, Release build, 26/26 unit, 21/21 integration;
 - frontend — success: audit, lint, 8/8 tests, build;
 - e2e — success: Compose stack и 4/4 Playwright;
-- `backend-test-results`, artifact ID `8283337177`, 87,993 bytes;
-- `frontend-test-results`, artifact ID `8283264823`, 837 bytes;
-- `frontend-build`, artifact ID `8283265138`, 114,025 bytes;
-- `playwright-report`, artifact ID `8283310069`, 209,117 bytes.
+- `backend-test-results`, artifact ID `8284120262`, 88,176 bytes;
+- `frontend-test-results`, artifact ID `8284053206`, 840 bytes;
+- `frontend-build`, artifact ID `8284053519`, 114,025 bytes;
+- `playwright-report`, artifact ID `8284103398`, 209,114 bytes.
 
 Локальные воспроизводимые результаты сохранены в игнорируемых Git каталогах:
 
-- `TestResults/integration-fixture-final-run-1/integration-fixture-final-run-1.trx`;
-- `TestResults/integration-fixture-final-run-2/integration-fixture-final-run-2.trx`;
-- `TestResults/ci-29260829492/*.trx`;
+- `TestResults/integration-readiness-run-1/integration-readiness-run-1.trx`;
+- `TestResults/integration-readiness-run-2/integration-readiness-run-2.trx`;
 - `apps/web/test-results/frontend-junit.xml`;
 - `apps/web/playwright-report/index.html`;
 - `apps/web/dist`.
