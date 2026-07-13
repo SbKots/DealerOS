@@ -6,6 +6,7 @@ using DealerOS.Api.Endpoints;
 using DealerOS.Api.Infrastructure;
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Application;
+using DealerOS.Modules.Reconditioning.Application;
 using DealerOS.Modules.Vehicles.Application;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -64,6 +65,9 @@ builder.Services.AddScoped<IInspectionStore>(sp => sp.GetRequiredService<Inspect
 builder.Services.AddScoped<IInspectionPhotoStorage, MinioInspectionPhotoStorage>();
 builder.Services.AddScoped<IInspectionImageProcessor, InspectionImageProcessor>();
 builder.Services.AddScoped<InspectionService>();
+builder.Services.AddScoped<ReconditioningStore>();
+builder.Services.AddScoped<IReconditioningStore>(sp => sp.GetRequiredService<ReconditioningStore>());
+builder.Services.AddScoped<ReconditioningService>();
 builder.Services.AddSingleton<IMinioClient>(_ =>
 {
     var endpoint = builder.Configuration["ObjectStorage:Endpoint"]
@@ -171,6 +175,7 @@ app.MapAuthEndpoints();
 app.MapOrganizationEndpoints();
 app.MapVehicleEndpoints();
 app.MapInspectionEndpoints();
+app.MapReconditioningEndpoints();
 app.Run();
 
 public partial class Program;

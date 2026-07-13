@@ -15,6 +15,8 @@ public static class DemoSeed
     public static readonly Guid VolgaAdminUserId = Guid.Parse("11111111-1111-4111-8111-111111111001");
     public static readonly Guid VolgaViewerUserId = Guid.Parse("11111111-1111-4111-8111-111111111002");
     public static readonly Guid VolgaInspectorUserId = Guid.Parse("11111111-1111-4111-8111-111111111003");
+    public static readonly Guid VolgaReconditioningUserId = Guid.Parse("11111111-1111-4111-8111-111111111004");
+    public static readonly Guid VolgaManagerUserId = Guid.Parse("11111111-1111-4111-8111-111111111005");
     public static readonly Guid NorthOrganizationId = Guid.Parse("22222222-2222-4222-8222-222222222222");
     public static readonly Guid NorthBranchId = Guid.Parse("22222222-2222-4222-8222-222222222201");
     public static readonly Guid NorthAdminUserId = Guid.Parse("22222222-2222-4222-8222-222222222001");
@@ -43,16 +45,27 @@ public static class DemoSeed
             AddUser(db, hasher, NorthAdminUserId, NorthOrganizationId, NorthBranchId, "admin@north-auto.demo", "Николай Северин", Permissions.VehicleOperator);
         if (!await db.Users.AnyAsync(x => x.Id == VolgaInspectorUserId, cancellationToken))
             AddUser(db, hasher, VolgaInspectorUserId, VolgaOrganizationId, VolgaBranchId, "inspector@volga-auto.demo", "Дмитрий Диагност", Permissions.InspectionOperator);
+        if (!await db.Users.AnyAsync(x => x.Id == VolgaReconditioningUserId, cancellationToken))
+            AddUser(db, hasher, VolgaReconditioningUserId, VolgaOrganizationId, VolgaBranchId,
+                "prep@volga-auto.demo", "Елена Подготовка", [Permissions.VehiclesRead, .. Permissions.ReconditioningOperator]);
+        if (!await db.Users.AnyAsync(x => x.Id == VolgaManagerUserId, cancellationToken))
+            AddUser(db, hasher, VolgaManagerUserId, VolgaOrganizationId, VolgaBranchId,
+                "manager@volga-auto.demo", "Марина Руководитель", [Permissions.VehiclesRead, .. Permissions.ReconditioningManager]);
         await db.SaveChangesAsync(cancellationToken);
 
         await EnsurePermissionsAsync(db, VolgaAdminUserId, Permissions.VehicleOperator, cancellationToken);
         await EnsurePermissionsAsync(db, NorthAdminUserId, Permissions.VehicleOperator, cancellationToken);
         await EnsurePermissionsAsync(db, VolgaInspectorUserId, Permissions.InspectionOperator, cancellationToken);
+        await EnsurePermissionsAsync(db, VolgaReconditioningUserId,
+            [Permissions.VehiclesRead, .. Permissions.ReconditioningOperator], cancellationToken);
+        await EnsurePermissionsAsync(db, VolgaManagerUserId,
+            [Permissions.VehiclesRead, .. Permissions.ReconditioningManager], cancellationToken);
 
         if (!await db.InspectionTemplates.AnyAsync(x => x.Id == VolgaTemplateId, cancellationToken))
             db.InspectionTemplates.Add(CreateTemplate(VolgaTemplateId, VolgaOrganizationId, VolgaAdminUserId));
         if (!await db.InspectionTemplates.AnyAsync(x => x.Id == NorthTemplateId, cancellationToken))
             db.InspectionTemplates.Add(CreateTemplate(NorthTemplateId, NorthOrganizationId, NorthAdminUserId));
+        await db.SaveChangesAsync(cancellationToken);
 
         const string demoInspectionVin = "XTA210990Y0200001";
         if (!await db.Vehicles.AnyAsync(x => x.OrganizationId == VolgaOrganizationId && x.Vin == demoInspectionVin,
@@ -64,6 +77,33 @@ public static class DemoSeed
                 VolgaAdminUserId);
             vehicle.AcceptToStock("MSK", now, VolgaAdminUserId);
             db.Vehicles.Add(vehicle);
+        }
+
+        const string demoReconditioningVin = "XTA210990Y0200002";
+        if (!await db.Vehicles.AnyAsync(x => x.OrganizationId == VolgaOrganizationId
+            && x.Vin == demoReconditioningVin, cancellationToken))
+        {
+            var now = DateTimeOffset.UtcNow;
+            var vehicle = Vehicle.CreateDraft(VolgaOrganizationId, VolgaBranchId, demoReconditioningVin,
+                "Lada", "XRAY", 2022, 46_200, new DealerOS.SharedKernel.Money(980_000m, "RUB"), now,
+                VolgaAdminUserId);
+            vehicle.AcceptToStock("MSK", now, VolgaAdminUserId);
+            vehicle.BeginInspection(now, VolgaInspectorUserId);
+            var template = await db.InspectionTemplates.Include(x => x.Items).SingleAsync(
+                x => x.Id == VolgaTemplateId, cancellationToken);
+            var inspection = Inspection.CreateDraft(VolgaOrganizationId, VolgaBranchId, vehicle.Id,
+                VolgaInspectorUserId, template, 46_200, now);
+            inspection.Start(now);
+            foreach (var item in inspection.Items)
+                inspection.SaveItem(item.Id, InspectionItemResult.Pass, "Demo seed", inspection.Version, now);
+            inspection.AddDefect(Guid.Parse("11111111-1111-4111-8111-111111113001"), InspectionCategory.Body,
+                "Повреждение переднего бампера", "Трещина и нарушение креплений после осмотра.",
+                DefectSeverity.Major, "Ремонт и окраска бампера", 32_000m, "RUB", true, true, false, false,
+                VolgaInspectorUserId, inspection.Version, now);
+            inspection.Complete("Требуется предпродажная подготовка", inspection.Version, now);
+            vehicle.CompleteInspection(true, now, VolgaInspectorUserId);
+            db.Vehicles.Add(vehicle);
+            db.Inspections.Add(inspection);
         }
         await db.SaveChangesAsync(cancellationToken);
     }

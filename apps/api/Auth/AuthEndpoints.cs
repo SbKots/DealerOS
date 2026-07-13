@@ -39,11 +39,13 @@ public static class AuthEndpoints
                 "UserAccount", user.Id, null, JsonSerializer.Serialize(new { user.IsActive }), http.TraceIdentifier,
                 timeProvider.GetUtcNow()));
             await db.SaveChangesAsync(cancellationToken);
-            return Results.Ok(new LoginResponse(tokens.Create(user), user.DisplayName, user.Email, organizationName, branchName));
+            return Results.Ok(new LoginResponse(tokens.Create(user), user.DisplayName, user.Email, organizationName,
+                branchName, user.PermissionSet.OrderBy(x => x).ToArray()));
         }).AllowAnonymous().RequireRateLimiting("login").WithName("Login");
         return endpoints;
     }
 }
 
 public sealed record LoginRequest(string? Email, string? Password);
-public sealed record LoginResponse(string AccessToken, string DisplayName, string Email, string OrganizationName, string BranchName);
+public sealed record LoginResponse(string AccessToken, string DisplayName, string Email, string OrganizationName,
+    string BranchName, IReadOnlyList<string> Permissions);

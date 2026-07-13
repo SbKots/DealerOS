@@ -1,0 +1,105 @@
+import { expect, test } from '@playwright/test'
+
+test('employee plans reconditioning, manager approves budget, and a new revision stays auditable', async ({ page }) => {
+  test.setTimeout(120_000)
+  const browserErrors: string[] = []
+  page.on('pageerror', (error) => browserErrors.push(error.message))
+  page.on('console', (message) => { if (message.type() === 'error') browserErrors.push(message.text()) })
+  const vin = `WVWZZZ3CZ7E${Math.floor(100000 + Math.random() * 899999)}`
+  const defectTitle = `Повреждение бампера ${vin.slice(-4)}`
+
+  await page.goto('/')
+  await login(page, 'admin@volga-auto.demo')
+  await page.getByLabel('Филиал').selectOption({ index: 1 })
+  await page.getByLabel('VIN').fill(vin)
+  await page.getByLabel('Марка').fill('Volkswagen')
+  await page.getByLabel('Модель').fill('Tiguan')
+  await page.getByLabel('Год').fill('2022')
+  await page.getByLabel('Пробег').fill('39000')
+  await page.getByLabel('Плановая цена закупки').fill('2400000')
+  await page.getByRole('button', { name: 'Создать поступление' }).click()
+  await page.getByRole('button', { name: /Принять на склад/ }).click()
+  await expect(page.getByRole('status')).toContainText('Автомобиль принят на склад')
+
+  await page.getByRole('navigation', { name: 'Разделы' }).getByRole('button', { name: 'Осмотры' }).click()
+  const inspectionQueueCard = page.locator('.queue-card').filter({ hasText: vin })
+  await inspectionQueueCard.getByRole('button', { name: 'Начать осмотр' }).click()
+  const resultGroups = page.getByRole('group', { name: /Результат:/ })
+  await expect(resultGroups).toHaveCount(11)
+  for (let index = 0; index < 11; index += 1) {
+    await resultGroups.nth(index).getByRole('button', { name: 'Норма' }).click()
+  }
+  await page.getByLabel('Категория дефекта').selectOption('Body')
+  await page.getByLabel('Название дефекта').fill(defectTitle)
+  await page.getByLabel('Описание дефекта').fill('Трещина и повреждение креплений')
+  await page.getByLabel('Серьёзность').selectOption('Major')
+  await page.getByLabel('Оценка ремонта').fill('32000')
+  await page.getByRole('checkbox', { name: 'Требует устранения' }).check()
+  await page.getByRole('button', { name: 'Добавить дефект' }).click()
+  await page.getByRole('button', { name: 'Завершить осмотр' }).click()
+  await page.getByLabel('Итоговый комментарий').fill('Передать в предпродажную подготовку')
+  await page.getByRole('button', { name: 'Подтвердить и завершить' }).click()
+  await expect(page.getByText(/открыть раздел «Подготовка»/)).toBeVisible()
+
+  await logout(page)
+  await login(page, 'prep@volga-auto.demo')
+  await page.getByRole('navigation', { name: 'Разделы' }).getByRole('button', { name: 'Подготовка' }).click()
+  const preparationCard = page.locator('.queue-card').filter({ hasText: vin })
+  await expect(preparationCard).toBeVisible()
+  await preparationCard.getByRole('button', { name: 'Создать план' }).click()
+  await expect(page.getByText('Обязательный дефект')).toBeVisible()
+  await page.getByLabel(`Тип исполнителя: ${defectTitle}`).selectOption('External')
+  await page.getByLabel(`Исполнитель: ${defectTitle}`).fill('Кузовной центр Партнёр')
+  await page.getByLabel(`Стоимость работы: ${defectTitle}`).fill('20000')
+  await page.getByLabel(`Стоимость запчастей: ${defectTitle}`).fill('15000')
+  await page.getByLabel(`Срок: ${defectTitle}`).fill('3')
+  await page.getByRole('button', { name: 'Сохранить работу' }).click()
+  await expect(page.locator('.metric.budget')).toContainText('35 000')
+
+  await page.getByRole('button', { name: '+ Добавить работу' }).click()
+  await page.getByLabel('Название новой работы').fill('Контрольная мойка после ремонта')
+  await page.getByRole('button', { name: 'Добавить в план' }).click()
+  await expect(page.locator('.work-card')).toHaveCount(2)
+  await page.locator('.work-card').nth(1).getByRole('button', { name: 'Удалить' }).click()
+  await page.locator('.work-card').nth(1).getByLabel(`Причина исключения: ${defectTitle}`).fill('Дублирующая работа')
+  await page.locator('.work-card').nth(1).getByRole('button', { name: 'Подтвердить удаление' }).click()
+  await expect(page.locator('.work-card')).toHaveCount(1)
+  await page.getByRole('button', { name: 'Отправить руководителю' }).click()
+  await expect(page.locator('.plan-status')).toHaveText('На согласовании')
+
+  await logout(page)
+  await login(page, 'manager@volga-auto.demo')
+  await page.getByRole('navigation', { name: 'Разделы' }).getByRole('button', { name: 'Подготовка' }).click()
+  const approval = page.locator('.approvals-queue .history-list button').filter({ hasText: vin })
+  await expect(approval).toBeVisible()
+  await approval.click()
+  await page.getByLabel('Одобренный лимит').fill('34000')
+  await page.getByLabel('Причина решения').fill('Согласовано с лимитом')
+  await page.getByRole('button', { name: 'Утвердить бюджет' }).click()
+  await expect(page.getByText('Бюджет утверждён')).toBeVisible()
+  await expect(page.getByLabel(`Название работы: ${defectTitle}`)).toBeDisabled()
+
+  await logout(page)
+  await login(page, 'prep@volga-auto.demo')
+  await page.getByRole('navigation', { name: 'Разделы' }).getByRole('button', { name: 'Подготовка' }).click()
+  const approvedCard = page.locator('.queue-card').filter({ hasText: vin })
+  await approvedCard.getByRole('button', { name: 'Открыть последний план' }).click()
+  await page.getByRole('button', { name: 'Создать новую ревизию' }).click()
+  await expect(page.getByText('Ревизия 1 → 2')).toBeVisible()
+  await expect(page.locator('.plan-status')).toHaveText('Черновик')
+  await expect(page.getByLabel(`Название работы: ${defectTitle}`)).toBeEnabled()
+  expect(browserErrors).toEqual([])
+})
+
+async function login(page: import('@playwright/test').Page, email: string) {
+  await expect(page.getByRole('heading', { name: 'Войдите в рабочее пространство' })).toBeVisible()
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Пароль').fill('DealerOS!2026')
+  await page.getByRole('button', { name: 'Войти в DealerOS' }).click()
+  await expect(page.getByRole('navigation', { name: 'Разделы' })).toBeVisible()
+}
+
+async function logout(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: 'Выйти' }).click()
+  await expect(page.getByRole('heading', { name: 'Войдите в рабочее пространство' })).toBeVisible()
+}

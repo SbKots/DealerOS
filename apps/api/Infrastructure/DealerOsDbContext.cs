@@ -1,6 +1,7 @@
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Domain;
 using DealerOS.Modules.Organizations;
+using DealerOS.Modules.Reconditioning.Domain;
 using DealerOS.Modules.Vehicles.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,6 +23,12 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
     public DbSet<InspectionDefect> InspectionDefects => Set<InspectionDefect>();
     public DbSet<InspectionPhoto> InspectionPhotos => Set<InspectionPhoto>();
     public DbSet<InspectionObjectDeletion> InspectionObjectDeletions => Set<InspectionObjectDeletion>();
+    public DbSet<ReconditioningPlan> ReconditioningPlans => Set<ReconditioningPlan>();
+    public DbSet<ReconditioningWork> ReconditioningWorks => Set<ReconditioningWork>();
+    public DbSet<ReconditioningDefectOmission> ReconditioningDefectOmissions => Set<ReconditioningDefectOmission>();
+    public DbSet<ReconditioningDecision> ReconditioningDecisions => Set<ReconditioningDecision>();
+    public DbSet<ReconditioningBudgetSnapshot> ReconditioningBudgetSnapshots => Set<ReconditioningBudgetSnapshot>();
+    public DbSet<ReconditioningPlanHistory> ReconditioningPlanHistory => Set<ReconditioningPlanHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,6 +40,7 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.RequireIndependentReconditioningApproval).HasDefaultValue(true);
         });
 
         modelBuilder.Entity<Branch>(entity =>
@@ -328,6 +336,176 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             entity.Property(x => x.ObjectKey).HasMaxLength(500);
             entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReconditioningPlan>(entity =>
+        {
+            entity.ToTable("plans", "reconditioning", table =>
+            {
+                table.HasCheckConstraint("ck_reconditioning_plans_status", "\"Status\" IN (1, 2, 3, 4, 5, 6)");
+                table.HasCheckConstraint("ck_reconditioning_plans_revision", "\"Revision\" > 0");
+                table.HasCheckConstraint("ck_reconditioning_plans_version", "\"Version\" > 0");
+                table.HasCheckConstraint("ck_reconditioning_plans_timestamps",
+                    "(\"Status\" IN (1, 3) AND \"DecidedAt\" IS NULL AND \"CancelledAt\" IS NULL) OR " +
+                    "(\"Status\" = 2 AND \"SubmittedAt\" IS NOT NULL AND \"DecidedAt\" IS NULL AND \"CancelledAt\" IS NULL) OR " +
+                    "(\"Status\" IN (4, 5) AND \"SubmittedAt\" IS NOT NULL AND \"DecidedAt\" IS NOT NULL AND \"CancelledAt\" IS NULL) OR " +
+                    "(\"Status\" = 6 AND \"CancelledAt\" IS NOT NULL)");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id })
+                .HasName("ak_reconditioning_plans_organization_id");
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId }).IsUnique()
+                .HasFilter("\"Status\" IN (1, 2, 3)")
+                .HasDatabaseName("ux_reconditioning_plans_active_vehicle");
+            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId, x.Revision }).IsUnique()
+                .HasDatabaseName("ux_reconditioning_plans_vehicle_revision");
+            entity.HasIndex(x => new { x.OrganizationId, x.BranchId, x.Status, x.UpdatedAt })
+                .HasDatabaseName("ix_reconditioning_plans_tenant_branch_status");
+            entity.HasOne<Vehicle>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Branch>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Inspection>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.SourceInspectionId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ReconditioningPlan>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.RevisesPlanId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.Navigation(x => x.Works).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.Omissions).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.Decisions).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.BudgetSnapshots).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.History).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ReconditioningWork>(entity =>
+        {
+            entity.ToTable("works", "reconditioning", table =>
+            {
+                table.HasCheckConstraint("ck_reconditioning_works_category", "\"Category\" BETWEEN 1 AND 8");
+                table.HasCheckConstraint("ck_reconditioning_works_priority", "\"Priority\" BETWEEN 1 AND 4");
+                table.HasCheckConstraint("ck_reconditioning_works_executor", "\"ExecutorType\" IN (1, 2)");
+                table.HasCheckConstraint("ck_reconditioning_works_amounts",
+                    "\"EstimatedLaborAmount\" >= 0 AND \"EstimatedPartsAmount\" >= 0");
+                table.HasCheckConstraint("ck_reconditioning_works_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+                table.HasCheckConstraint("ck_reconditioning_works_duration", "\"EstimatedDurationDays\" BETWEEN 1 AND 365");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.SourceDefectTitle).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.SourceDefectDescription).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.SourceDefectSeverity).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.ExecutorName).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.EstimatedLaborAmount).HasPrecision(19, 2);
+            entity.Property(x => x.EstimatedPartsAmount).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.Comment).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.OrganizationId, x.PlanId, x.SourceDefectId });
+            entity.HasOne<ReconditioningPlan>().WithMany(x => x.Works)
+                .HasForeignKey(x => new { x.OrganizationId, x.PlanId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<InspectionDefect>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.SourceDefectId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReconditioningDefectOmission>(entity =>
+        {
+            entity.ToTable("defect_omissions", "reconditioning");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.SourceDefectTitle).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(2000).IsRequired();
+            entity.HasIndex(x => new { x.OrganizationId, x.PlanId, x.SourceDefectId }).IsUnique()
+                .HasDatabaseName("ux_reconditioning_omissions_plan_defect");
+            entity.HasOne<ReconditioningPlan>().WithMany(x => x.Omissions)
+                .HasForeignKey(x => new { x.OrganizationId, x.PlanId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<InspectionDefect>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.SourceDefectId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.DecidedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReconditioningDecision>(entity =>
+        {
+            entity.ToTable("decisions", "reconditioning", table =>
+            {
+                table.HasCheckConstraint("ck_reconditioning_decisions_type", "\"Type\" IN (1, 2, 3)");
+                table.HasCheckConstraint("ck_reconditioning_decisions_money",
+                    "(\"ApprovedLimitAmount\" IS NULL AND \"Currency\" IS NULL) OR " +
+                    "(\"ApprovedLimitAmount\" >= 0 AND \"Currency\" ~ '^[A-Z]{3}$')");
+            });
+            entity.HasKey(x => new { x.OrganizationId, x.PlanId, x.Id });
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Reason).HasMaxLength(2000);
+            entity.Property(x => x.ApprovedLimitAmount).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3);
+            entity.HasIndex(x => new { x.OrganizationId, x.PlanId, x.Id }).IsUnique()
+                .HasDatabaseName("ux_reconditioning_decisions_command");
+            entity.HasOne<ReconditioningPlan>().WithMany(x => x.Decisions)
+                .HasForeignKey(x => new { x.OrganizationId, x.PlanId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReconditioningBudgetSnapshot>(entity =>
+        {
+            entity.ToTable("budget_snapshots", "reconditioning", table =>
+            {
+                table.HasCheckConstraint("ck_reconditioning_snapshots_amounts",
+                    "\"LaborAmount\" >= 0 AND \"PartsAmount\" >= 0 AND \"PlannedTotalAmount\" >= 0 AND \"ApprovedLimitAmount\" >= 0");
+                table.HasCheckConstraint("ck_reconditioning_snapshots_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.LaborAmount).HasPrecision(19, 2);
+            entity.Property(x => x.PartsAmount).HasPrecision(19, 2);
+            entity.Property(x => x.PlannedTotalAmount).HasPrecision(19, 2);
+            entity.Property(x => x.ApprovedLimitAmount).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.HasIndex(x => new { x.OrganizationId, x.PlanId }).IsUnique()
+                .HasDatabaseName("ux_reconditioning_snapshot_plan");
+            entity.HasOne<ReconditioningPlan>().WithMany(x => x.BudgetSnapshots)
+                .HasForeignKey(x => new { x.OrganizationId, x.PlanId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.ApprovedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReconditioningPlanHistory>(entity =>
+        {
+            entity.ToTable("plan_history", "reconditioning", table =>
+            {
+                table.HasCheckConstraint("ck_reconditioning_history_from",
+                    "\"FromStatus\" IS NULL OR \"FromStatus\" IN (1, 2, 3, 4, 5, 6)");
+                table.HasCheckConstraint("ck_reconditioning_history_to", "\"ToStatus\" IN (1, 2, 3, 4, 5, 6)");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Reason).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.OrganizationId, x.PlanId, x.OccurredAt });
+            entity.HasOne<ReconditioningPlan>().WithMany(x => x.History)
+                .HasForeignKey(x => new { x.OrganizationId, x.PlanId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

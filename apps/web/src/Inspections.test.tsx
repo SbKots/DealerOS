@@ -66,7 +66,7 @@ describe('inspection workspace', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /Ревизия 1/ }))
     expect(await screen.findByText(/Результат зафиксирован/)).toBeInTheDocument()
-    expect(screen.getByText(/0.3/)).toBeInTheDocument()
+    expect(screen.getByText(/раздел «Подготовка»/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Добавить дефект' })).not.toBeInTheDocument()
   })
 })

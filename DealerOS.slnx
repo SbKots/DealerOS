@@ -13,6 +13,9 @@
   <Folder Name="/modules/Organizations/">
     <Project Path="modules/Organizations/DealerOS.Modules.Organizations.csproj" />
   </Folder>
+  <Folder Name="/modules/Reconditioning/">
+    <Project Path="modules/Reconditioning/DealerOS.Modules.Reconditioning.csproj" />
+  </Folder>
   <Folder Name="/modules/SharedKernel/">
     <Project Path="modules/SharedKernel/DealerOS.SharedKernel.csproj" />
   </Folder>

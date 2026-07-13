@@ -16,13 +16,22 @@
 - дефекты, Critical-блокировка, MinIO-фото и неизменяемый результат;
 - permission/tenant/branch isolation, optimistic concurrency, audit, integration и Playwright e2e.
 
-## Следующая итерация 0.3 — план подготовки
+## Готово в коде — итерация 0.3
 
-1. Интервью: приёмщик, диагност, руководитель площадки; исключения VIN/документов/ключей.
-2. Разделить стабильный VehiclePassport и StockIntake episode до поддержки повторного поступления.
-3. Физическая локация, комплектность ключей/документов/колёс и акт ответственности.
-4. `ReconditioningPlan` из дефектов `RepairRequired`, plan cost/deadline/owner без факта ремонта.
-5. Серверная пагинация/фильтры реестра и импорт CSV с preview.
+- очередь `ReconditioningRequired` и автоматический перенос обязательных дефектов;
+- редактор работ, labor/parts/currency/deadline/executor и групповой бюджет;
+- submit, approval queue, approve/reject/request-changes/cancel отдельными командами;
+- независимое согласование, idempotent/concurrent decision, immutable budget snapshot;
+- новая ревизия утверждённого плана, сравнение и read-only история;
+- tenant-aware constraints, optimistic concurrency, audit, PostgreSQL/component/Playwright tests.
+
+## Следующая итерация 0.4 — выполнение подготовки
+
+1. Фактическое выполнение работ и заказ-наряды.
+2. Склад/резерв/списание запчастей и фактические расходы.
+3. Контроль качества и переход к полной `ReadyForSale`.
+4. Расчёты с подрядчиками и план/факт отклонения бюджета.
+5. Уведомления по срокам и просрочкам.
 
 ## Позже по MVP
 

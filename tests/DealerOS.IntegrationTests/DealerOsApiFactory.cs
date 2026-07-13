@@ -48,6 +48,12 @@ public sealed class DealerOsApiFactory(string connectionString, string? objectSt
         await action(scope.ServiceProvider.GetRequiredService<DealerOsDbContext>());
     }
 
+    public async Task<TResult> ExecuteDbWithResultAsync<TResult>(Func<DealerOsDbContext, Task<TResult>> action)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        return await action(scope.ServiceProvider.GetRequiredService<DealerOsDbContext>());
+    }
+
     public Task SetUserAsync(Guid userId, bool isActive, params string[] permissions) => ExecuteDbAsync(async db =>
     {
         var user = await db.Users.SingleAsync(x => x.Id == userId);
