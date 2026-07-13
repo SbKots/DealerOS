@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\apps\api\DealerOS.Api.csproj" />
     <ProjectReference Include="..\..\modules\Inspections\DealerOS.Modules.Inspections.csproj" />
     <ProjectReference Include="..\..\modules\Reconditioning\DealerOS.Modules.Reconditioning.csproj" />
