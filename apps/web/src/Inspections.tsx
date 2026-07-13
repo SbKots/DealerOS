@@ -11,7 +11,7 @@ type InspectionItem = {
   sortOrder: number; result: 'Pending' | 'Pass' | 'Fail' | 'NotApplicable'; comment?: string
 }
 type InspectionPhoto = {
-  id: string; originalFileName: string; contentType: string; sizeBytes: number; downloadUrl: string
+  id: string; sourcePhotoId?: string; originalFileName: string; contentType: string; sizeBytes: number; downloadUrl: string
 }
 type InspectionDefect = {
   id: string; category: string; title: string; description: string; severity: 'Minor' | 'Major' | 'Critical'

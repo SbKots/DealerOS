@@ -23,7 +23,7 @@ type IntakeForm = z.output<typeof intakeSchema>
 export type Branch = { id: string; code: string; name: string }
 export type Vehicle = {
   id: string; branchId: string; branchName: string; vin: string; make: string; model: string; year: number
-  mileageKm: number; plannedPurchaseAmount: number; currency: string; status: 'IntakeDraft' | 'InStock' | 'InspectionInProgress' | 'ReconditioningRequired' | 'ReadyForSale'
+  mileageKm: number; plannedPurchaseAmount: number; currency: string; status: 'IntakeDraft' | 'InStock' | 'InspectionInProgress' | 'ReconditioningRequired' | 'InspectionPassed'
   stockNumber?: string; createdAt: string; acceptedAt?: string; version: number
 }
 
@@ -170,7 +170,7 @@ function VehicleCard({ vehicle, accepting, onAccept, onOpenInspections, error }:
 }
 
 function Status({ status }: { status: Vehicle['status'] }) {
-  const labels: Record<Vehicle['status'], string> = { IntakeDraft: 'Черновик', InStock: 'На складе', InspectionInProgress: 'На осмотре', ReconditioningRequired: 'Нужна подготовка', ReadyForSale: 'Готов к продаже' }
+  const labels: Record<Vehicle['status'], string> = { IntakeDraft: 'Черновик', InStock: 'На складе', InspectionInProgress: 'На осмотре', ReconditioningRequired: 'Нужна подготовка', InspectionPassed: 'Осмотр пройден' }
   return <span className={`status ${status === 'IntakeDraft' ? 'draft' : 'success'}`}><i />{labels[status]}</span>
 }
 

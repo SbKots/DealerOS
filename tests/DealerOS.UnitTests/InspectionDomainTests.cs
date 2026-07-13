@@ -94,6 +94,29 @@ public sealed class InspectionDomainTests
         Assert.All(correction.Items, item => Assert.Equal(InspectionItemResult.Pass, item.Result));
     }
 
+    [Fact]
+    public void Correction_CopiesPhotoMetadataAndReferencesImmutableSourcePhoto()
+    {
+        var source = CreateStarted();
+        foreach (var item in source.Items)
+            source.SaveItem(item.Id, InspectionItemResult.Pass, null, source.Version, Now);
+        var defect = source.AddDefect(Guid.NewGuid(), InspectionCategory.Body, "Царапина", "На двери",
+            DefectSeverity.Minor, null, null, null, false, false, false, false,
+            InspectorId, source.Version, Now);
+        var sourcePhoto = source.AddPhoto(defect.Id, Guid.NewGuid(), "evidence.png", "immutable/object.png",
+            "image/png", 100, InspectorId, source.Version, Now);
+        source.Complete("Original", source.Version, Now);
+
+        var correction = Inspection.CreateCorrection(source, InspectorId, Now.AddDays(1));
+        var copiedPhoto = Assert.Single(Assert.Single(correction.Defects).Photos);
+
+        Assert.NotEqual(sourcePhoto.Id, copiedPhoto.Id);
+        Assert.Equal(sourcePhoto.Id, copiedPhoto.SourcePhotoId);
+        Assert.Equal(sourcePhoto.ObjectKey, copiedPhoto.ObjectKey);
+        Assert.Single(Assert.Single(source.Defects).Photos);
+        Assert.Equal(InspectionStatus.Completed, source.Status);
+    }
+
     private static Inspection CreateDraft() => Inspection.CreateDraft(OrganizationId, BranchId, VehicleId,
         InspectorId, CreateTemplate(), 42_000, Now);
 

@@ -21,6 +21,7 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
     public DbSet<InspectionItem> InspectionItems => Set<InspectionItem>();
     public DbSet<InspectionDefect> InspectionDefects => Set<InspectionDefect>();
     public DbSet<InspectionPhoto> InspectionPhotos => Set<InspectionPhoto>();
+    public DbSet<InspectionObjectDeletion> InspectionObjectDeletions => Set<InspectionObjectDeletion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -298,10 +299,13 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id })
+                .HasName("ak_inspection_photos_organization_id");
             entity.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
             entity.Property(x => x.ObjectKey).HasMaxLength(500).IsRequired();
             entity.Property(x => x.ContentType).HasMaxLength(50).IsRequired();
-            entity.HasIndex(x => x.ObjectKey).IsUnique().HasDatabaseName("ux_inspection_photos_object_key");
+            entity.HasIndex(x => new { x.OrganizationId, x.ObjectKey })
+                .HasDatabaseName("ix_inspection_photos_tenant_object_key");
             entity.HasOne<InspectionDefect>().WithMany(x => x.Photos)
                 .HasForeignKey(x => new { x.OrganizationId, x.DefectId })
                 .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
@@ -309,6 +313,20 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             entity.HasOne<UserAccount>().WithMany()
                 .HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
                 .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<InspectionPhoto>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.SourcePhotoId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+        });
+
+        modelBuilder.Entity<InspectionObjectDeletion>(entity =>
+        {
+            entity.ToTable("object_deletion_queue", "inspections");
+            entity.HasKey(x => new { x.OrganizationId, x.ObjectKey });
+            entity.Property(x => x.ObjectKey).HasMaxLength(500);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

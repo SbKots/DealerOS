@@ -7,7 +7,7 @@ using Npgsql;
 
 namespace DealerOS.Api.Infrastructure;
 
-public sealed class InspectionStore(DealerOsDbContext dbContext) : IInspectionStore
+public sealed class InspectionStore(DealerOsDbContext dbContext, ILogger<InspectionStore> logger) : IInspectionStore
 {
     public Task<Vehicle?> FindVehicleAsync(Guid organizationId, Guid vehicleId, CancellationToken cancellationToken) =>
         dbContext.Vehicles.Include(x => x.StatusHistory)
@@ -88,6 +88,51 @@ public sealed class InspectionStore(DealerOsDbContext dbContext) : IInspectionSt
         .Where(x => x.OrganizationId == organizationId).OrderByDescending(x => x.Version)
         .ToListAsync(cancellationToken)).Select(MapTemplate).ToArray();
 
+    public Task<InspectionPhotoRegistration?> FindPhotoRegistrationAsync(Guid organizationId, Guid photoId,
+        CancellationToken cancellationToken) =>
+        (from photo in dbContext.InspectionPhotos.AsNoTracking()
+         join defect in dbContext.InspectionDefects.AsNoTracking()
+             on new { photo.OrganizationId, Id = photo.DefectId }
+             equals new { defect.OrganizationId, Id = defect.Id }
+         where photo.OrganizationId == organizationId && photo.Id == photoId
+         select new InspectionPhotoRegistration(defect.InspectionId, defect.Id))
+        .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<string>> StageUnreferencedObjectDeletionsAsync(Guid organizationId,
+        Guid removedDefectId, IReadOnlyCollection<string> objectKeys, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var queued = new List<string>();
+        foreach (var objectKey in objectKeys.Distinct(StringComparer.Ordinal))
+        {
+            if (await dbContext.InspectionPhotos.AsNoTracking().AnyAsync(x => x.OrganizationId == organizationId
+                    && x.ObjectKey == objectKey && x.DefectId != removedDefectId, cancellationToken))
+                continue;
+            if (!await dbContext.InspectionObjectDeletions.AnyAsync(x => x.OrganizationId == organizationId
+                    && x.ObjectKey == objectKey, cancellationToken))
+                dbContext.InspectionObjectDeletions.Add(new InspectionObjectDeletion(organizationId, objectKey, now));
+            queued.Add(objectKey);
+        }
+        return queued;
+    }
+
+    public async Task CompleteObjectDeletionAsync(Guid organizationId, string objectKey,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dbContext.InspectionObjectDeletions.Where(x => x.OrganizationId == organizationId
+                && x.ObjectKey == objectKey).ExecuteDeleteAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Object {ObjectKey} was deleted but its tenant cleanup record could not be completed", objectKey);
+        }
+    }
+
+    public void ResetTracking() => dbContext.ChangeTracker.Clear();
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         try
@@ -127,8 +172,8 @@ public sealed class InspectionStore(DealerOsDbContext dbContext) : IInspectionSt
                     x.Severity.ToString(), x.Recommendation, x.EstimatedRepairAmount, x.Currency,
                     x.RepairRequired, x.BlocksPublication, x.BlocksTestDrive, x.BlocksSale,
                     x.CreatedByUserId, x.CreatedAt, x.Photos.OrderBy(p => p.CreatedAt)
-                        .Select(p => new InspectionPhotoResponse(p.Id, p.OriginalFileName, p.ContentType,
-                            p.SizeBytes, $"/api/inspections/{inspection.Id}/defects/{x.Id}/photos/{p.Id}",
+                        .Select(p => new InspectionPhotoResponse(p.Id, p.SourcePhotoId, p.OriginalFileName,
+                            p.ContentType, p.SizeBytes, $"/api/inspections/{inspection.Id}/defects/{x.Id}/photos/{p.Id}",
                             p.CreatedByUserId, p.CreatedAt)).ToArray())).ToArray());
 
     private static InspectionTemplateResponse MapTemplate(InspectionTemplate template) => new(template.Id,

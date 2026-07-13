@@ -86,7 +86,7 @@ public sealed class Vehicle
 
     public void BeginInspectionCorrection(DateTimeOffset now, Guid actorUserId)
     {
-        if (Status is not (VehicleStatus.ReconditioningRequired or VehicleStatus.ReadyForSale))
+        if (Status is not (VehicleStatus.ReconditioningRequired or VehicleStatus.InspectionPassed))
             throw new DomainException("vehicle.correction_invalid_status", "Корректировка недоступна для текущего статуса автомобиля.");
         TransitionTo(VehicleStatus.InspectionInProgress, now, actorUserId);
     }
@@ -95,7 +95,7 @@ public sealed class Vehicle
     {
         if (Status != VehicleStatus.InspectionInProgress)
             throw new DomainException("vehicle.inspection_not_in_progress", "У автомобиля нет выполняемого осмотра.");
-        TransitionTo(needsReconditioning ? VehicleStatus.ReconditioningRequired : VehicleStatus.ReadyForSale,
+        TransitionTo(needsReconditioning ? VehicleStatus.ReconditioningRequired : VehicleStatus.InspectionPassed,
             now, actorUserId);
     }
 

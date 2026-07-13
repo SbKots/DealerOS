@@ -32,18 +32,20 @@ JWT содержит `org_id`, `branch_id`, `permission`; request body не со
 ```text
 IntakeDraft -- accept-to-stock (обязательные данные + право + доступ к филиалу) --> InStock
 InStock -- start inspection --> InspectionInProgress
-InspectionInProgress -- complete(no blocking defects) --> ReadyForSale
+InspectionInProgress -- complete(no blocking defects) --> InspectionPassed
 InspectionInProgress -- complete(repair/blocking defects) --> ReconditioningRequired
 InspectionInProgress -- cancel --> InStock
 ```
 
-Повторный переход запрещён доменом. Универсального PATCH статуса нет. Каждое создание/принятие создаёт status history и audit event в одном `SaveChanges`.
+`InspectionPassed` означает только техническое прохождение осмотра без дефектов, требующих подготовки или блокирующих продажу. Это не полная готовность к продаже: будущий `ReadyForSale` может быть установлен только после подготовки и контроля качества в следующем процессе. Повторный переход запрещён доменом. Универсального PATCH статуса нет. Каждое создание/принятие создаёт status history и audit event в одном `SaveChanges`.
 
 ## Осмотры и файлы
 
 Partial unique index в PostgreSQL разрешает один Draft/InProgress на автомобиль. `Version` защищает команды; повтор complete идемпотентен. Завершённая ревизия не изменяется; correction создаёт новый Inspection со ссылкой на источник.
 
-Файл до 8 МБ декодируется SkiaSharp, ограничивается 25 MP, перекодируется в JPEG/PNG/WebP и теряет исходные metadata. Ключ генерирует сервер с tenant prefix. Bucket приватен; скачивание идёт через permission-checked API, без public/presigned URL. Если запись метаданных не удалась, object удаляется компенсирующей операцией; нависшие multipart uploads не используются.
+Файл до 8 МБ декодируется SkiaSharp, ограничивается 25 MP, перекодируется в JPEG/PNG/WebP и теряет исходные metadata. Каждая попытка upload получает отдельный server-generated object key с tenant prefix и случайным attempt ID. При DB conflict проигравшая команда удаляет только свой object, повторно читает регистрацию `photoId` и возвращает идемпотентный результат только для того же inspection/defect; другое назначение даёт `409`.
+
+Photo metadata correction-ревизии получает новый `Id`, сохраняет `SourcePhotoId` и ссылается на тот же неизменяемый object без копирования бинарного файла. Физическое удаление разрешено только при отсутствии metadata-ссылок. Удаление дефекта атомарно с PostgreSQL ставит tenant-aware идемпотентную запись в `inspections.object_deletion_queue`; сбой MinIO оставляет эту запись для reconciliation и не превращает уже сохранённое DB-удаление в ложный rollback. Bucket приватен; скачивание идёт через permission-checked API, без public/presigned URL.
 
 ## Данные
 

@@ -320,6 +320,7 @@ public sealed class InspectionDefect
         var copy = new InspectionDefect(Guid.NewGuid(), OrganizationId, inspectionId, Category, Title, Description,
             Severity, Recommendation, EstimatedRepairAmount, Currency, RepairRequired, BlocksPublication,
             BlocksTestDrive, BlocksSale, actorUserId, now);
+        foreach (var photo in _photos) copy._photos.Add(photo.CopyTo(copy.Id));
         return copy;
     }
 
@@ -336,7 +337,8 @@ public sealed class InspectionPhoto
 {
     private InspectionPhoto() { }
     internal InspectionPhoto(Guid id, Guid organizationId, Guid defectId, string originalFileName, string objectKey,
-        string contentType, long sizeBytes, Guid createdByUserId, DateTimeOffset createdAt)
+        string contentType, long sizeBytes, Guid createdByUserId, DateTimeOffset createdAt,
+        Guid? sourcePhotoId = null)
     {
         if (id == Guid.Empty) throw new DomainException("inspection_photo.id_required", "Идентификатор фотографии обязателен.");
         Id = id;
@@ -350,15 +352,20 @@ public sealed class InspectionPhoto
         SizeBytes = sizeBytes;
         CreatedByUserId = createdByUserId;
         CreatedAt = createdAt;
+        SourcePhotoId = sourcePhotoId;
     }
 
     public Guid Id { get; private set; }
     public Guid OrganizationId { get; private set; }
     public Guid DefectId { get; private set; }
+    public Guid? SourcePhotoId { get; private set; }
     public string OriginalFileName { get; private set; } = string.Empty;
     public string ObjectKey { get; private set; } = string.Empty;
     public string ContentType { get; private set; } = string.Empty;
     public long SizeBytes { get; private set; }
     public Guid CreatedByUserId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
+
+    internal InspectionPhoto CopyTo(Guid defectId) => new(Guid.NewGuid(), OrganizationId, defectId,
+        OriginalFileName, ObjectKey, ContentType, SizeBytes, CreatedByUserId, CreatedAt, SourcePhotoId ?? Id);
 }

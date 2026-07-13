@@ -22,8 +22,8 @@ public sealed record InspectionSummaryResponse(Guid Id, Guid VehicleId, Guid Bra
     long Version, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 public sealed record InspectionItemResponse(Guid Id, string Key, string Category, string Label, string? Description,
     bool IsRequired, int SortOrder, string Result, string? Comment, DateTimeOffset UpdatedAt);
-public sealed record InspectionPhotoResponse(Guid Id, string OriginalFileName, string ContentType, long SizeBytes,
-    string DownloadUrl, Guid CreatedByUserId, DateTimeOffset CreatedAt);
+public sealed record InspectionPhotoResponse(Guid Id, Guid? SourcePhotoId, string OriginalFileName, string ContentType,
+    long SizeBytes, string DownloadUrl, Guid CreatedByUserId, DateTimeOffset CreatedAt);
 public sealed record InspectionDefectResponse(Guid Id, string Category, string Title, string Description,
     string Severity, string? Recommendation, decimal? EstimatedRepairAmount, string? Currency,
     bool RepairRequired, bool BlocksPublication, bool BlocksTestDrive, bool BlocksSale,
@@ -40,6 +40,7 @@ public sealed record InspectionTemplateItemResponse(Guid Id, string Key, string 
     string? Description, bool IsRequired, int SortOrder);
 public sealed record InspectionPhotoDownload(Stream Content, string ContentType, string FileName, long SizeBytes);
 public sealed record NormalizedInspectionImage(Stream Content, string ContentType, string Extension, long SizeBytes);
+public sealed record InspectionPhotoRegistration(Guid InspectionId, Guid DefectId);
 
 public interface IInspectionStore
 {
@@ -61,6 +62,12 @@ public interface IInspectionStore
         CancellationToken cancellationToken);
     Task<IReadOnlyList<InspectionTemplateResponse>> ListTemplatesAsync(Guid organizationId,
         CancellationToken cancellationToken);
+    Task<InspectionPhotoRegistration?> FindPhotoRegistrationAsync(Guid organizationId, Guid photoId,
+        CancellationToken cancellationToken);
+    Task<IReadOnlyList<string>> StageUnreferencedObjectDeletionsAsync(Guid organizationId, Guid removedDefectId,
+        IReadOnlyCollection<string> objectKeys, DateTimeOffset now, CancellationToken cancellationToken);
+    Task CompleteObjectDeletionAsync(Guid organizationId, string objectKey, CancellationToken cancellationToken);
+    void ResetTracking();
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 

@@ -6,7 +6,9 @@
 
 ## Вертикальный срез
 
-`InStock vehicle -> inspection queue -> start -> checklist -> defects -> private photos -> complete -> ReconditioningRequired/ReadyForSale -> read-only result`.
+`InStock vehicle -> inspection queue -> start -> checklist -> defects -> private photos -> complete -> ReconditioningRequired/InspectionPassed -> read-only result`.
+
+`InspectionPassed` — промежуточная техническая готовность после осмотра, а не полная готовность к продаже. `ReadyForSale` появится только после подготовки и контроля качества в последующей итерации.
 
 ## Архитектурный план
 
@@ -26,6 +28,9 @@
 - tenant/branch/permission IDOR закрыты на API и DB уровнях;
 - invalid/oversized/spoofed image отклоняется до появления photo metadata;
 - MinIO failure не оставляет подтверждённую фотографию;
+- конкурентные upload с одним `photoId` не удаляют object победившей команды и корректно различают идемпотентный retry и конфликт назначения;
+- correction сохраняет photo evidence через новую metadata и `SourcePhotoId`, не копируя бинарный object;
+- сбой удаления MinIO после DB commit оставляет tenant-aware cleanup record и не сообщает ложный rollback;
 - concurrent start/complete не создаёт дубли;
 - fresh DB и upgrade с 0.1 проходят миграции;
 - clean Compose и GitHub Actions зелёные;

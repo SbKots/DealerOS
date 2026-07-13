@@ -134,14 +134,21 @@ public sealed class InspectionService(IInspectionStore store, IAuditWriter audit
     {
         Demand(actor, Permissions.VehicleInspectionsEdit);
         var inspection = await FindScopedAsync(actor, inspectionId, cancellationToken);
+        var registration = await store.FindPhotoRegistrationAsync(actor.OrganizationId, photoId, cancellationToken);
+        if (registration is not null)
+        {
+            if (registration.InspectionId == inspectionId && registration.DefectId == defectId)
+                return await GetResponseRequiredAsync(actor, inspection.Id, cancellationToken);
+            throw PhotoIdConflict();
+        }
         inspection.ValidateEditable(expectedVersion);
-        var existing = inspection.Defects.SelectMany(x => x.Photos).SingleOrDefault(x => x.Id == photoId);
-        if (existing is not null) return await GetResponseRequiredAsync(actor, inspection.Id, cancellationToken);
 
         var normalized = await imageProcessor.NormalizeAsync(content, declaredLength, originalFileName,
             declaredContentType, cancellationToken);
         await using var normalizedContent = normalized.Content;
-        var objectKey = $"organizations/{actor.OrganizationId:N}/inspections/{inspection.Id:N}/defects/{defectId:N}/{photoId:N}.{normalized.Extension}";
+        var uploadAttemptId = Guid.NewGuid();
+        var objectKey = $"organizations/{actor.OrganizationId:N}/inspections/{inspection.Id:N}/defects/{defectId:N}" +
+            $"/{photoId:N}/{uploadAttemptId:N}.{normalized.Extension}";
         await photoStorage.PutAsync(objectKey, normalized.Content, normalized.SizeBytes, normalized.ContentType, cancellationToken);
         try
         {
@@ -153,16 +160,23 @@ public sealed class InspectionService(IInspectionStore store, IAuditWriter audit
                 correlationId, now);
             await store.SaveChangesAsync(cancellationToken);
         }
+        catch (ConflictException)
+        {
+            await DeleteUploadAttemptAsync(objectKey);
+            store.ResetTracking();
+            registration = await store.FindPhotoRegistrationAsync(actor.OrganizationId, photoId,
+                CancellationToken.None);
+            if (registration is not null)
+            {
+                if (registration.InspectionId == inspectionId && registration.DefectId == defectId)
+                    return await GetResponseRequiredAsync(actor, inspectionId, CancellationToken.None);
+                throw PhotoIdConflict();
+            }
+            throw;
+        }
         catch
         {
-            try
-            {
-                await photoStorage.DeleteAsync(objectKey, CancellationToken.None);
-            }
-            catch (StorageUnavailableException)
-            {
-                // The adapter logs the orphan cleanup failure; preserve the original command failure.
-            }
+            await DeleteUploadAttemptAsync(objectKey);
             throw;
         }
 
@@ -176,10 +190,23 @@ public sealed class InspectionService(IInspectionStore store, IAuditWriter audit
         var inspection = await FindScopedAsync(actor, inspectionId, cancellationToken);
         var now = timeProvider.GetUtcNow();
         var objectKeys = inspection.RemoveDraftDefect(defectId, expectedVersion, now);
+        var queuedObjectKeys = await store.StageUnreferencedObjectDeletionsAsync(actor.OrganizationId, defectId,
+            objectKeys, now, cancellationToken);
         audit.Write(actor.OrganizationId, actor.UserId, "inspection.defect_removed", "InspectionDefect", defectId,
             null, JsonSerializer.Serialize(new { inspectionId }), correlationId, now);
         await store.SaveChangesAsync(cancellationToken);
-        foreach (var objectKey in objectKeys) await photoStorage.DeleteAsync(objectKey, cancellationToken);
+        foreach (var objectKey in queuedObjectKeys)
+        {
+            try
+            {
+                await photoStorage.DeleteAsync(objectKey, cancellationToken);
+                await store.CompleteObjectDeletionAsync(actor.OrganizationId, objectKey, CancellationToken.None);
+            }
+            catch (StorageUnavailableException)
+            {
+                // DB deletion and its tenant-aware cleanup record are already committed for reconciliation.
+            }
+        }
         return await GetResponseRequiredAsync(actor, inspection.Id, cancellationToken);
     }
 
@@ -288,4 +315,19 @@ public sealed class InspectionService(IInspectionStore store, IAuditWriter audit
     {
         if (!actor.BranchIds.Contains(branchId)) throw new ForbiddenException("Филиал недоступен пользователю.");
     }
+
+    private async Task DeleteUploadAttemptAsync(string objectKey)
+    {
+        try
+        {
+            await photoStorage.DeleteAsync(objectKey, CancellationToken.None);
+        }
+        catch (StorageUnavailableException)
+        {
+            // The adapter logs cleanup failure. A unique attempt key cannot belong to a successful command.
+        }
+    }
+
+    private static ConflictException PhotoIdConflict() => new("inspection_photo.id_conflict",
+        "Идентификатор фотографии уже использован для другого дефекта.");
 }

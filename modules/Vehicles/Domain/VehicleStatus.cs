@@ -6,5 +6,5 @@ public enum VehicleStatus
     InStock = 2,
     InspectionInProgress = 3,
     ReconditioningRequired = 4,
-    ReadyForSale = 5
+    InspectionPassed = 5
 }

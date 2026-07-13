@@ -11,4 +11,7 @@
 - Critical всегда задаёт repair required и blocks sale;
 - Completed неизменяем; исправление создаёт revision;
 - template fields копируются в inspection items;
-- photo object key никогда не формируется из client filename.
+- photo object key никогда не формируется из client filename и уникален для каждой upload-попытки;
+- retry `photoId` идемпотентен только в рамках того же inspection/defect;
+- correction photo metadata хранит `SourcePhotoId` и разделяет неизменяемый object без копирования бинарного файла;
+- удаление последней ссылки атомарно ставит tenant-aware запись в `object_deletion_queue`; MinIO failure не сообщает ложный DB rollback.
