@@ -7,34 +7,18 @@ using DealerOS.Modules.Inspections.Domain;
 using DealerOS.Modules.Reconditioning.Domain;
 using DealerOS.Modules.Vehicles.Domain;
 using DealerOS.SharedKernel;
-using DotNet.Testcontainers.Builders;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
-using Testcontainers.PostgreSql;
 
 namespace DealerOS.IntegrationTests;
 
-public sealed class ReconditioningApiTests : IAsyncLifetime
+public sealed class ReconditioningApiTests(ReconditioningPostgresFixture database)
+    : IClassFixture<ReconditioningPostgresFixture>, IAsyncLifetime
 {
-    private string _connectionString = string.Empty;
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("dealeros_reconditioning_tests")
-        .WithUsername("dealeros")
-        .WithPassword("dealeros")
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilCommandIsCompleted("pg_isready", "-U", "dealeros"))
-        .Build();
+    private readonly ReconditioningPostgresFixture _database = database;
 
-    public async Task InitializeAsync()
-    {
-        await _postgres.StartAsync();
-        _connectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString())
-        {
-            Pooling = false,
-            SslMode = SslMode.Disable
-        }.ConnectionString;
-    }
+    public Task InitializeAsync() => _database.ResetDatabaseAsync();
 
-    public async Task DisposeAsync() => await _postgres.DisposeAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task FullPlanWorkflow_IsAuditedApprovedImmutableAndTenantIsolated()
@@ -292,7 +276,7 @@ public sealed class ReconditioningApiTests : IAsyncLifetime
     [Fact]
     public async Task Migration_UpgradesFrom02AndFreshDatabaseStartsWithDemoQueue()
     {
-        var options = new DbContextOptionsBuilder<DealerOsDbContext>().UseNpgsql(_connectionString).Options;
+        var options = new DbContextOptionsBuilder<DealerOsDbContext>().UseNpgsql(_database.ConnectionString).Options;
         await using (var db = new DealerOsDbContext(options))
             await db.Database.MigrateAsync("20260713083112_InspectionPhotoReliability02");
 
@@ -306,7 +290,7 @@ public sealed class ReconditioningApiTests : IAsyncLifetime
             .SingleAsync()) == 1);
     }
 
-    private DealerOsApiFactory CreateFactory() => new(_connectionString);
+    private DealerOsApiFactory CreateFactory() => new(_database.ConnectionString);
 
     private static async Task<(Guid PlanId, long Version, decimal Total)> CreateSubmittedPlanAsync(
         DealerOsApiFactory factory)
