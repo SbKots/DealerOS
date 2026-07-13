@@ -51,7 +51,7 @@ test('diagnost completes an immutable vehicle inspection with a defect photo', a
   await page.getByLabel('Итоговый комментарий').fill('Направить на предпродажную подготовку')
   await page.getByRole('button', { name: 'Подтвердить и завершить' }).click()
   await expect(page.getByText(/Результат зафиксирован/)).toBeVisible()
-  await expect(page.getByText(/0.3/)).toBeVisible()
+  await expect(page.getByText(/открыть раздел «Подготовка»/)).toBeVisible()
 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Приём автомобиля' })).toBeVisible()

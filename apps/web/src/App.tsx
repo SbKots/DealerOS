@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { api, ApiError, clearSession, getSession, hasSession, saveSession, sessionExpiredEvent, type Session } from './api'
 import { InspectionsWorkspace } from './Inspections'
+import { ReconditioningWorkspace } from './Reconditioning'
 import './App.css'
 
 const intakeSchema = z.object({
@@ -35,7 +36,7 @@ export default function App() {
   const queryClient = useQueryClient()
   const [authenticated, setAuthenticated] = useState(hasSession())
   const [selected, setSelected] = useState<Vehicle | null>(null)
-  const [view, setView] = useState<'intake' | 'inspections'>('intake')
+  const [view, setView] = useState<'intake' | 'inspections' | 'reconditioning'>('intake')
   const [inspectionVehicle, setInspectionVehicle] = useState<Vehicle | null>(null)
   const [email, setEmail] = useState('admin@volga-auto.demo')
   const [password, setPassword] = useState('DealerOS!2026')
@@ -66,7 +67,7 @@ export default function App() {
 
   const login = useMutation({
     mutationFn: () => api<Session>('/api/auth/login', { method: 'POST', body: { email, password }, authenticated: false }),
-    onSuccess: (session) => { saveSession(session); setAuthenticated(true) },
+    onSuccess: (session) => { saveSession(session); setView('intake'); setAuthenticated(true) },
   })
 
   const createVehicle = useMutation({
@@ -106,14 +107,15 @@ export default function App() {
       <div className="brand"><span className="brand-mark">D</span><span>DealerOS</span></div>
       <nav className="main-nav" aria-label="Разделы">
         <button className={view === 'intake' ? 'active' : ''} onClick={() => setView('intake')}>Приёмка</button>
-        <button className={view === 'inspections' ? 'active' : ''} onClick={() => { setInspectionVehicle(null); setView('inspections') }}>Осмотры</button>
+        {session?.permissions?.includes('vehicles.inspections.view') && <button className={view === 'inspections' ? 'active' : ''} onClick={() => { setInspectionVehicle(null); setView('inspections') }}>Осмотры</button>}
+        {session?.permissions?.includes('reconditioning.view') && <button className={view === 'reconditioning' ? 'active' : ''} onClick={() => setView('reconditioning')}>Подготовка</button>}
       </nav>
       <div className="context-pill"><span className="pulse" />{session?.organizationName} · {session?.branchName}</div>
-      <button className="link-button" onClick={() => { clearSession(); setAuthenticated(false); queryClient.clear() }}>Выйти</button>
+      <button className="link-button" onClick={() => { clearSession(); setView('intake'); setAuthenticated(false); queryClient.clear() }}>Выйти</button>
     </header>
 
     <main className="workspace">
-      {view === 'inspections' ? <InspectionsWorkspace focusVehicle={inspectionVehicle} onClearFocus={() => setInspectionVehicle(null)} /> : <>
+      {view === 'inspections' ? <InspectionsWorkspace focusVehicle={inspectionVehicle} onClearFocus={() => setInspectionVehicle(null)} /> : view === 'reconditioning' ? <ReconditioningWorkspace /> : <>
       <div className="page-heading">
         <div><p className="eyebrow">Склад автомобилей</p><h1>Приём автомобиля</h1><p className="muted">Создайте цифровой паспорт, затем подтвердите фактическую приёмку на площадку.</p></div>
         <div className="metric"><span>На контроле</span><strong>{vehicles.data?.filter((x) => x.status === 'IntakeDraft').length ?? 0}</strong><small>черновиков поступления</small></div>

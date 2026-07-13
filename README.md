@@ -1,6 +1,6 @@
 # DealerOS
 
-DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.2 продолжает приёмку сквозным осмотром: очередь InStock, версионный чек-лист, дефекты, защищённые фотографии в MinIO, неизменяемый результат, аудит и tenant/branch isolation.
+DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.3 связывает завершённый осмотр с планом предпродажной подготовки: обязательные дефекты, работы, плановый бюджет, очередь руководителя, неизменяемое решение и ревизии под tenant/branch isolation.
 
 ## Быстрый запуск
 
@@ -20,6 +20,8 @@ docker compose up --build
 Пользователь только для чтения: `viewer@volga-auto.demo`, пароль тот же. Его JWT не содержит permissions создания и приёмки автомобиля.
 
 Демо-диагност: `inspector@volga-auto.demo`, пароль тот же. MinIO Console: `http://localhost:9001`, локальные credentials заданы только в `compose.yaml`.
+
+Демо-подготовка: `prep@volga-auto.demo`. Демо-руководитель: `manager@volga-auto.demo`. Пароль тот же. Для них включено правило независимого согласования: автор не может утвердить собственный план.
 
 Остановить окружение: `docker compose down`. Удалить только локальные демонстрационные данные: `docker compose down -v`.
 
@@ -63,7 +65,7 @@ Integration tests используют настоящий PostgreSQL в Testcont
 
 - `apps/api` — composition root, HTTP API, EF Core, JWT, миграции и адаптеры;
 - `apps/web` — React/TypeScript интерфейс и Playwright e2e;
-- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles и Inspections;
+- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles, Inspections и Reconditioning;
 - `tests` — backend unit и PostgreSQL integration tests;
 - `docs` — продукт, архитектура, решения, безопасность, demo и backlog;
 - `compose.yaml` — воспроизводимое локальное окружение;

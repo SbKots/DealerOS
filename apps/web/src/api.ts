@@ -2,7 +2,7 @@ const sessionKey = 'dealeros.session'
 export const sessionExpiredEvent = 'dealeros:session-expired'
 
 type ApiOptions = { method?: string; body?: unknown; authenticated?: boolean }
-export type Session = { accessToken: string; displayName: string; email: string; organizationName: string; branchName: string }
+export type Session = { accessToken: string; displayName: string; email: string; organizationName: string; branchName: string; permissions?: string[] }
 
 export class ApiError extends Error {
   status: number

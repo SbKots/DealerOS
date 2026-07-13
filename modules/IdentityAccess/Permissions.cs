@@ -11,6 +11,27 @@ public static class Permissions
     public const string VehicleInspectionsComplete = "vehicles.inspections.complete";
     public const string VehicleInspectionsCancel = "vehicles.inspections.cancel";
     public const string VehicleInspectionsManageTemplates = "vehicles.inspections.manage_templates";
+    public const string ReconditioningView = "reconditioning.view";
+    public const string ReconditioningCreate = "reconditioning.create";
+    public const string ReconditioningEdit = "reconditioning.edit";
+    public const string ReconditioningSubmit = "reconditioning.submit";
+    public const string ReconditioningApprove = "reconditioning.approve";
+    public const string ReconditioningCancel = "reconditioning.cancel";
+
+    public static readonly string[] ReconditioningOperator =
+    [
+        ReconditioningView,
+        ReconditioningCreate,
+        ReconditioningEdit,
+        ReconditioningSubmit,
+        ReconditioningCancel
+    ];
+
+    public static readonly string[] ReconditioningManager =
+    [
+        ReconditioningView,
+        ReconditioningApprove
+    ];
 
     public static readonly string[] InspectionOperator =
     [
@@ -28,6 +49,8 @@ public static class Permissions
         VehiclesCreate,
         VehiclesAccept,
         .. InspectionOperator,
-        VehicleInspectionsManageTemplates
+        VehicleInspectionsManageTemplates,
+        .. ReconditioningOperator,
+        ReconditioningApprove
     ];
 }

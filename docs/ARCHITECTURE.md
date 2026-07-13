@@ -18,6 +18,7 @@ React/Vite -> ASP.NET Core command endpoints -> application services -> aggregat
 - `Organizations`: организации и филиалы.
 - `Vehicles`: VIN, Money usage, агрегат Vehicle, переходы и use cases поступления.
 - `Inspections`: версионные шаблоны, агрегат Inspection, пункты, дефекты, метаданные фото и команды lifecycle.
+- `Reconditioning`: агрегат плана, работы, исключения обязательных дефектов, решения, бюджетные snapshots и ревизии.
 - `SharedKernel`: только стабильные малые понятия и типы ошибок.
 - `apps/api/Infrastructure`: EF mappings по схемам `identity`, `organizations`, `vehicles`, `audit`; это адаптер, а не место бизнес-правил.
 
@@ -35,6 +36,13 @@ InStock -- start inspection --> InspectionInProgress
 InspectionInProgress -- complete(no blocking defects) --> InspectionPassed
 InspectionInProgress -- complete(repair/blocking defects) --> ReconditioningRequired
 InspectionInProgress -- cancel --> InStock
+
+Reconditioning Draft -- submit --> Submitted
+Submitted -- request-changes --> ChangesRequested -- submit --> Submitted
+Submitted -- approve --> Approved
+Submitted -- reject --> Rejected
+Draft/Submitted/ChangesRequested -- cancel --> Cancelled
+Approved -- create-revision --> Draft(revision + 1)
 ```
 
 `InspectionPassed` означает только техническое прохождение осмотра без дефектов, требующих подготовки или блокирующих продажу. Это не полная готовность к продаже: будущий `ReadyForSale` может быть установлен только после подготовки и контроля качества в следующем процессе. Повторный переход запрещён доменом. Универсального PATCH статуса нет. Каждое создание/принятие создаёт status history и audit event в одном `SaveChanges`.
@@ -46,6 +54,14 @@ Partial unique index в PostgreSQL разрешает один Draft/InProgress 
 Файл до 8 МБ декодируется SkiaSharp, ограничивается 25 MP, перекодируется в JPEG/PNG/WebP и теряет исходные metadata. Каждая попытка upload получает отдельный server-generated object key с tenant prefix и случайным attempt ID. При DB conflict проигравшая команда удаляет только свой object, повторно читает регистрацию `photoId` и возвращает идемпотентный результат только для того же inspection/defect; другое назначение даёт `409`.
 
 Photo metadata correction-ревизии получает новый `Id`, сохраняет `SourcePhotoId` и ссылается на тот же неизменяемый object без копирования бинарного файла. Физическое удаление разрешено только при отсутствии metadata-ссылок. Удаление дефекта атомарно с PostgreSQL ставит tenant-aware идемпотентную запись в `inspections.object_deletion_queue`; сбой MinIO оставляет эту запись для reconciliation и не превращает уже сохранённое DB-удаление в ложный rollback. Bucket приватен; скачивание идёт через permission-checked API, без public/presigned URL.
+
+## План подготовки и согласование
+
+`ReconditioningPlan` создаётся только из Completed inspection автомобиля в `ReconditioningRequired`. Каждый `RepairRequired` defect превращается в обязательную работу со snapshot исходного описания и tenant-aware FK к дефекту. Partial unique index допускает один активный `Draft/Submitted/ChangesRequested` на автомобиль. Изменение состава, денег и статуса выполняется отдельными командами; универсального PATCH статуса нет.
+
+Работы хранят labor и parts как `decimal(19,2) + currency`. Read model группирует разные валюты, а submit требует одну валюту, поэтому система никогда не складывает их молча. Удаление последней обязательной работы по дефекту требует причины и создаёт `defect_omission`. Approved создаёт отдельный неизменяемый `budget_snapshot` с плановой суммой и одобренным лимитом. Повтор decision ID идемпотентен; другой payload с тем же ID конфликтует. `Version` и составной unique constraint гарантируют один результат конкурентного согласования.
+
+Approved не редактируется. Новая ревизия копирует работы/обоснованные исключения в новый Draft, сохраняет ссылку `RevisesPlanId` и проходит повторное согласование. Исходный план, решение и snapshot остаются неизменными. Настройка организации `RequireIndependentReconditioningApproval` запрещает автору согласовать собственный план.
 
 ## Данные
 
