@@ -7,6 +7,7 @@ namespace DealerOS.IntegrationTests;
 public sealed class ReconditioningPostgresFixture : IAsyncLifetime
 {
     private const string DatabaseName = "dealeros_reconditioning_tests";
+    private readonly SemaphoreSlim _startGate = new(1, 1);
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase(DatabaseName)
         .WithUsername("dealeros")
@@ -16,17 +17,37 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
 
     public string ConnectionString { get; private set; } = string.Empty;
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task PrepareDatabaseAsync()
     {
-        await _postgres.StartAsync();
-        ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString())
-        {
-            Pooling = false,
-            SslMode = SslMode.Disable
-        }.ConnectionString;
+        await EnsureStartedAsync();
+        await ResetDatabaseAsync();
     }
 
-    public async Task ResetDatabaseAsync()
+    private async Task EnsureStartedAsync()
+    {
+        if (ConnectionString.Length > 0) return;
+
+        await _startGate.WaitAsync();
+        try
+        {
+            if (ConnectionString.Length > 0) return;
+
+            await _postgres.StartAsync();
+            ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString())
+            {
+                Pooling = false,
+                SslMode = SslMode.Disable
+            }.ConnectionString;
+        }
+        finally
+        {
+            _startGate.Release();
+        }
+    }
+
+    private async Task ResetDatabaseAsync()
     {
         var adminConnectionString = new NpgsqlConnectionStringBuilder(ConnectionString)
         {
@@ -46,6 +67,7 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await _postgres.DisposeAsync();
+        _startGate.Dispose();
     }
 }
 

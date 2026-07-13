@@ -16,7 +16,7 @@ public sealed class ReconditioningApiTests(ReconditioningPostgresFixture databas
 {
     private readonly ReconditioningPostgresFixture _database = database;
 
-    public Task InitializeAsync() => _database.ResetDatabaseAsync();
+    public Task InitializeAsync() => _database.PrepareDatabaseAsync();
 
     public Task DisposeAsync() => Task.CompletedTask;
 
