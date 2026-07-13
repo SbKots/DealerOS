@@ -9,6 +9,7 @@ using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Application;
 using DealerOS.Modules.Operations.Application;
 using DealerOS.Modules.Reconditioning.Application;
+using DealerOS.Modules.Sales.Application;
 using DealerOS.Modules.Vehicles.Application;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -80,6 +81,9 @@ builder.Services.AddScoped<MediaListingService>();
 builder.Services.AddScoped<CrmStore>();
 builder.Services.AddScoped<ICrmStore>(sp => sp.GetRequiredService<CrmStore>());
 builder.Services.AddScoped<CrmService>();
+builder.Services.AddScoped<SalesStore>();
+builder.Services.AddScoped<ISalesStore>(sp => sp.GetRequiredService<SalesStore>());
+builder.Services.AddScoped<SalesService>();
 builder.Services.AddHostedService<OperationsDeadlineWorker>();
 builder.Services.AddSingleton<IMinioClient>(_ =>
 {
@@ -192,6 +196,7 @@ app.MapReconditioningEndpoints();
 app.MapOperationsEndpoints();
 app.MapQualityListingEndpoints();
 app.MapCrmEndpoints();
+app.MapSalesEndpoints();
 app.Run();
 
 public partial class Program;

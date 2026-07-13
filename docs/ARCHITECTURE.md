@@ -1,5 +1,9 @@
 # Архитектура
 
+## Дополнение 0.7: Sales
+
+Модуль `Sales` владеет агрегатами `Visit` и `SalesOffer`, их историями, решениями и `ApprovedOfferSnapshot`. Application service читает проверенные проекции CRM, Vehicle, Listing и Operations через порт, но изменяет только таблицы схемы `sales`. PostgreSQL composite FK сохраняют tenant integrity, optimistic tokens защищают команды, а GiST exclusion constraints атомарно запрещают пересечение активных слотов менеджера и test-drive автомобиля. Публичная цена и подтверждённая себестоимость копируются в Offer как финансовый snapshot; последующие изменения источников не переписывают утверждённое предложение.
+
 ## Стиль
 
 Модульный монолит в monorepo. Модули владеют доменом и публичными application-контрактами; `apps/api` — composition root и инфраструктурные адаптеры. PostgreSQL атомарно сохраняет доменное состояние, историю и аудит; MinIO добавлен как S3-compatible object storage для фото. Redis, брокер и Kubernetes не добавлены: текущему срезу они не дают измеримой пользы.

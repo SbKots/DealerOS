@@ -428,6 +428,295 @@ public sealed class ReleaseTrainApiTests(ReconditioningPostgresFixture database)
             || payload.Contains("+79991234567", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task VisitAndOfferWorkflow_PreventsOverlapAndCreatesOneImmutableApprovedSnapshot()
+    {
+        await using var databaseLease = await _database.BeginTestAsync();
+        await using var factory = new DealerOsApiFactory(_database.ConnectionString,
+            _database.ObjectStorageEndpoint);
+        using var preparer = factory.CreateClient();
+        using var manager = factory.CreateClient();
+        using var admin = factory.CreateClient();
+        await AuthenticateAsync(preparer, "prep@volga-auto.demo");
+        await AuthenticateAsync(manager, "manager@volga-auto.demo");
+        await AuthenticateAsync(admin, "admin@volga-auto.demo");
+        var vehicleId = await CreateReadyListingVehicleAsync(factory, preparer, manager);
+
+        var customerCreate = await PostAndReadAsync(manager, "/api/crm/customers", new
+        {
+            branchId = DemoSeed.VolgaBranchId,
+            type = "Individual",
+            name = "Покупатель 0.7",
+            phone = "+7 999 765-43-21",
+            preferredChannel = "Phone",
+            consentGiven = true,
+            marketingConsent = false,
+            consentAt = DateTimeOffset.UtcNow,
+            consentSource = "Визит в салон"
+        });
+        var customerId = customerCreate.GetProperty("customer").GetProperty("id").GetGuid();
+        var lead = await PostAndReadAsync(manager, "/api/crm/leads", new
+        {
+            branchId = DemoSeed.VolgaBranchId,
+            customerId,
+            vehicleId,
+            source = "demo-channel"
+        });
+        var leadId = lead.GetProperty("id").GetGuid();
+        lead = await PostAndReadAsync(manager, $"/api/crm/leads/{leadId}/assign", new
+        {
+            commandId = Guid.NewGuid(),
+            managerUserId = DemoSeed.VolgaManagerUserId,
+            expectedVersion = lead.GetProperty("version").GetInt64()
+        });
+        lead = await PostAndReadAsync(manager, $"/api/crm/leads/{leadId}/activities", new
+        {
+            commandId = Guid.NewGuid(),
+            type = "Call",
+            direction = "Outbound",
+            result = "Answered",
+            summary = "Согласован визит",
+            meaningfulContact = true,
+            nextAction = "Провести test drive",
+            nextActionDueAt = DateTimeOffset.UtcNow.AddDays(2),
+            expectedVersion = lead.GetProperty("version").GetInt64()
+        });
+        lead = await PostAndReadAsync(manager, $"/api/crm/leads/{leadId}/qualify", new
+        {
+            commandId = Guid.NewGuid(),
+            nextAction = "Провести test drive",
+            nextActionDueAt = DateTimeOffset.UtcNow.AddDays(2),
+            expectedVersion = lead.GetProperty("version").GetInt64()
+        });
+        Assert.Equal("Qualified", lead.GetProperty("status").GetString());
+
+        var startsAt = DateTimeOffset.UtcNow.AddDays(2);
+        var endsAt = startsAt.AddHours(1);
+        var visitRequests = new[] { Guid.NewGuid(), Guid.NewGuid() }.Select(visitId => manager.PostAsJsonAsync(
+            "/api/sales/visits", new { visitId, leadId, startsAt, endsAt, includesTestDrive = true })).ToArray();
+        var visitResponses = await Task.WhenAll(visitRequests);
+        Assert.DoesNotContain(visitResponses, x => x.StatusCode == HttpStatusCode.InternalServerError);
+        Assert.Single(visitResponses, x => x.StatusCode == HttpStatusCode.OK);
+        Assert.Single(visitResponses, x => x.StatusCode == HttpStatusCode.Conflict);
+        var visit = await ReadJsonAsync(visitResponses.Single(x => x.StatusCode == HttpStatusCode.OK));
+        var visitId = visit.GetProperty("id").GetGuid();
+        using (var prematureOffer = await manager.PostAsJsonAsync("/api/sales/offers/preview", new
+        {
+            leadId,
+            lineItems = Array.Empty<object>(),
+            discountAmount = 0m
+        }))
+            Assert.Equal(HttpStatusCode.BadRequest, prematureOffer.StatusCode);
+        visit = await PostAndReadAsync(manager, $"/api/sales/visits/{visitId}/arrive", new
+        {
+            commandId = Guid.NewGuid(),
+            expectedVersion = visit.GetProperty("version").GetInt64()
+        });
+        visit = await PostAndReadAsync(manager, $"/api/sales/visits/{visitId}/test-drive/check-out", new
+        {
+            commandId = Guid.NewGuid(),
+            driverDocumentsChecked = true,
+            issueChecklist = "Ключ, СТС и состояние сверены",
+            odometerOutKm = 46_250,
+            conditionOut = "Без новых повреждений",
+            expectedVersion = visit.GetProperty("version").GetInt64()
+        });
+        visit = await PostAndReadAsync(manager, $"/api/sales/visits/{visitId}/test-drive/check-in", new
+        {
+            commandId = Guid.NewGuid(),
+            returnChecklist = "Ключ, СТС и автомобиль возвращены",
+            odometerInKm = 46_266,
+            conditionIn = "Без новых повреждений",
+            incidentOccurred = false,
+            expectedVersion = visit.GetProperty("version").GetInt64()
+        });
+        visit = await PostAndReadAsync(manager, $"/api/sales/visits/{visitId}/complete", new
+        {
+            commandId = Guid.NewGuid(),
+            result = "Клиент готов получить предложение",
+            nextAction = "Согласовать скидку",
+            nextActionDueAt = DateTimeOffset.UtcNow.AddDays(1),
+            expectedVersion = visit.GetProperty("version").GetInt64()
+        });
+        Assert.Equal("Completed", visit.GetProperty("status").GetString());
+
+        var lineId = Guid.NewGuid();
+        var preview = await PostAndReadAsync(manager, "/api/sales/offers/preview", new
+        {
+            leadId,
+            lineItems = new[] { new { id = lineId, category = "Equipment", name = "Зимние шины", amount = 20_000m, currency = "RUB" } },
+            discountAmount = 100_000m
+        });
+        Assert.Equal(1_270_000m, preview.GetProperty("finalPriceAmount").GetDecimal());
+        Assert.True(preview.GetProperty("requiresManagerApproval").GetBoolean());
+        var offerId = Guid.NewGuid();
+        var validUntil = DateTimeOffset.UtcNow.AddDays(10);
+        var offer = await PostAndReadAsync(manager, "/api/sales/offers", new
+        {
+            offerId,
+            leadId,
+            validUntil,
+            lineItems = new[] { new { id = lineId, category = "Equipment", name = "Зимние шины", amount = 20_000m, currency = "RUB" } },
+            discountAmount = 100_000m
+        });
+        var createdLine = offer.GetProperty("lineItems")[0];
+        var retryPayload = new
+        {
+            offerId,
+            leadId,
+            validUntil,
+            lineItems = new[]
+            {
+                new
+                {
+                    id = createdLine.GetProperty("id").GetGuid(),
+                    category = createdLine.GetProperty("category").GetString(),
+                    name = createdLine.GetProperty("name").GetString(),
+                    amount = createdLine.GetProperty("amount").GetDecimal(),
+                    currency = createdLine.GetProperty("currency").GetString()
+                }
+            },
+            discountAmount = 100_000m
+        };
+        var idempotentOffer = await PostAndReadAsync(manager, "/api/sales/offers", retryPayload);
+        Assert.Equal(offer.GetProperty("id").GetGuid(), idempotentOffer.GetProperty("id").GetGuid());
+        using (var conflictingOffer = await manager.PostAsJsonAsync("/api/sales/offers", new
+        {
+            offerId,
+            leadId,
+            validUntil,
+            retryPayload.lineItems,
+            discountAmount = 90_000m
+        }))
+            Assert.Equal(HttpStatusCode.Conflict, conflictingOffer.StatusCode);
+
+        offer = await PostAndReadAsync(manager, $"/api/sales/offers/{offerId}/submit", new
+        {
+            commandId = Guid.NewGuid(),
+            expectedVersion = offer.GetProperty("version").GetInt64()
+        });
+        Assert.Equal("Submitted", offer.GetProperty("status").GetString());
+        using var selfApproval = await manager.PostAsJsonAsync($"/api/sales/offers/{offerId}/decision", new
+        {
+            decisionId = Guid.NewGuid(),
+            decision = "Approved",
+            reason = "Собственное решение",
+            expectedVersion = offer.GetProperty("version").GetInt64()
+        });
+        Assert.Equal(HttpStatusCode.Forbidden, selfApproval.StatusCode);
+
+        var submittedVersion = offer.GetProperty("version").GetInt64();
+        var firstDecisionId = Guid.NewGuid();
+        var secondDecisionId = Guid.NewGuid();
+        var decisions = await Task.WhenAll(
+            admin.PostAsJsonAsync($"/api/sales/offers/{offerId}/decision", new
+            {
+                decisionId = firstDecisionId,
+                decision = "Approved",
+                reason = "Маржа и скидка подтверждены",
+                expectedVersion = submittedVersion
+            }),
+            admin.PostAsJsonAsync($"/api/sales/offers/{offerId}/decision", new
+            {
+                decisionId = secondDecisionId,
+                decision = "Approved",
+                reason = "Альтернативное решение",
+                expectedVersion = submittedVersion
+            }));
+        Assert.DoesNotContain(decisions, x => x.StatusCode == HttpStatusCode.InternalServerError);
+        Assert.Single(decisions, x => x.StatusCode == HttpStatusCode.OK);
+        Assert.Single(decisions, x => x.StatusCode == HttpStatusCode.Conflict);
+        offer = await ReadJsonAsync(decisions.Single(x => x.StatusCode == HttpStatusCode.OK));
+        Assert.Equal("Approved", offer.GetProperty("status").GetString());
+        var approvedSnapshotId = offer.GetProperty("approvedSnapshot").GetProperty("id").GetGuid();
+        using var staleReject = await admin.PostAsJsonAsync($"/api/sales/offers/{offerId}/decision", new
+        {
+            decisionId = Guid.NewGuid(),
+            decision = "Rejected",
+            reason = "Конфликтующее решение",
+            expectedVersion = submittedVersion
+        });
+        Assert.Equal(HttpStatusCode.Conflict, staleReject.StatusCode);
+
+        var revisionId = Guid.NewGuid();
+        var revision = await PostAndReadAsync(admin, $"/api/sales/offers/{offerId}/revisions", new
+        {
+            commandId = Guid.NewGuid(),
+            revisionId,
+            validUntil = DateTimeOffset.UtcNow.AddDays(14),
+            expectedVersion = offer.GetProperty("version").GetInt64()
+        });
+        Assert.Equal(2, revision.GetProperty("revision").GetInt32());
+        Assert.Equal("Draft", revision.GetProperty("status").GetString());
+        offer = await GetAndReadAsync(admin, $"/api/sales/offers/{offerId}");
+        Assert.Equal(approvedSnapshotId, offer.GetProperty("approvedSnapshot").GetProperty("id").GetGuid());
+        Assert.Equal(1_270_000m, offer.GetProperty("approvedSnapshot").GetProperty("finalPriceAmount").GetDecimal());
+
+        using var north = factory.CreateClient();
+        await AuthenticateAsync(north, "admin@north-auto.demo");
+        Assert.Equal(HttpStatusCode.NotFound, (await north.GetAsync($"/api/sales/visits/{visitId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await north.GetAsync($"/api/sales/offers/{offerId}")).StatusCode);
+        Assert.Equal(1, await factory.QueryDbAsync(db => db.Visits.CountAsync(x => x.LeadId == leadId)));
+        Assert.Equal(1, await factory.QueryDbAsync(db => db.ApprovedOfferSnapshots.CountAsync(x =>
+            x.OfferId == offerId)));
+    }
+
+    private static async Task<Guid> CreateReadyListingVehicleAsync(DealerOsApiFactory factory, HttpClient preparer,
+        HttpClient manager)
+    {
+        var (planId, _, _) = await CreateApprovedPlanAsync(factory);
+        var execution = await PostAndReadAsync(preparer, "/api/operations/executions", new { planId });
+        var executionId = execution.GetProperty("id").GetGuid();
+        var vehicleId = execution.GetProperty("vehicleId").GetGuid();
+        var workOrderId = execution.GetProperty("workOrders")[0].GetProperty("id").GetGuid();
+        execution = await PostAndReadAsync(preparer, $"/api/operations/executions/{executionId}/start",
+            new { expectedVersion = execution.GetProperty("version").GetInt64() });
+        execution = await PostAndReadAsync(preparer,
+            $"/api/operations/executions/{executionId}/work-orders/{workOrderId}/start",
+            new { expectedVersion = execution.GetProperty("version").GetInt64() });
+        execution = await PostAndReadAsync(preparer,
+            $"/api/operations/executions/{executionId}/work-orders/{workOrderId}/actuals", new
+            {
+                laborHours = 3m,
+                laborAmount = 10_000m,
+                externalAmount = 0m,
+                expectedVersion = execution.GetProperty("version").GetInt64()
+            });
+        execution = await PostAndReadAsync(preparer,
+            $"/api/operations/executions/{executionId}/work-orders/{workOrderId}/complete",
+            new { comment = "Выполнено для 0.7", expectedVersion = execution.GetProperty("version").GetInt64() });
+        execution = await PostAndReadAsync(preparer, $"/api/operations/executions/{executionId}/complete",
+            new { expectedVersion = execution.GetProperty("version").GetInt64() });
+        var quality = await PostAndReadAsync(manager, $"/api/quality-checks/executions/{executionId}", null);
+        quality = await PostAndReadAsync(manager, $"/api/quality-checks/{quality.GetProperty("id").GetGuid()}/pass",
+            new { comment = "QC для sales", expectedVersion = quality.GetProperty("version").GetInt64() });
+        Assert.Equal("Passed", quality.GetProperty("status").GetString());
+        var media = new List<JsonElement>();
+        foreach (var category in new[] { "Exterior", "Interior", "DamageHistory" })
+            media.Add(await UploadMediaAsync(preparer, vehicleId, Guid.NewGuid(), category));
+        await PostAndReadAsync(preparer,
+            $"/api/vehicles/{vehicleId}/media/{media[0].GetProperty("id").GetGuid()}/cover",
+            new { expectedVersion = media[0].GetProperty("version").GetInt64() });
+        var listing = await PostAndReadAsync(preparer, $"/api/vehicles/{vehicleId}/listing", new { });
+        using (var update = await preparer.PutAsJsonAsync($"/api/listings/{listing.GetProperty("id").GetGuid()}",
+            new
+            {
+                commandId = Guid.NewGuid(),
+                equipment = "Климат",
+                advantages = "Прозрачная история",
+                conditionDescription = "Подготовка и QC завершены.",
+                publicPriceAmount = 1_350_000m,
+                currency = "RUB",
+                templateName = "DealerOS Default",
+                templateVersion = 1,
+                expectedVersion = listing.GetProperty("version").GetInt64()
+            })) listing = await ReadJsonAsync(update);
+        listing = await PostAndReadAsync(preparer, $"/api/listings/{listing.GetProperty("id").GetGuid()}/ready",
+            new { commandId = Guid.NewGuid(), expectedVersion = listing.GetProperty("version").GetInt64() });
+        Assert.Equal("Ready", listing.GetProperty("status").GetString());
+        return vehicleId;
+    }
+
     private static async Task<(Guid PlanId, Guid SnapshotId, decimal Total)> CreateApprovedPlanAsync(
         DealerOsApiFactory factory)
     {

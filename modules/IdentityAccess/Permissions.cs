@@ -36,6 +36,38 @@ public static class Permissions
     public const string CrmLeadsCreate = "crm.leads.create";
     public const string CrmLeadsAssign = "crm.leads.assign";
     public const string CrmLeadsWork = "crm.leads.work";
+    public const string SalesVisitsView = "sales.visits.view";
+    public const string SalesVisitsCreate = "sales.visits.create";
+    public const string SalesVisitsEdit = "sales.visits.edit";
+    public const string SalesVisitsComplete = "sales.visits.complete";
+    public const string SalesOffersView = "sales.offers.view";
+    public const string SalesOffersCreate = "sales.offers.create";
+    public const string SalesOffersEdit = "sales.offers.edit";
+    public const string SalesOffersSubmit = "sales.offers.submit";
+    public const string SalesOffersAutoApprove = "sales.offers.auto_approve";
+    public const string SalesOffersApprove = "sales.offers.approve";
+    public const string SalesOffersCancel = "sales.offers.cancel";
+
+    public static readonly string[] SalesOperator =
+    [
+        SalesVisitsView,
+        SalesVisitsCreate,
+        SalesVisitsEdit,
+        SalesVisitsComplete,
+        SalesOffersView,
+        SalesOffersCreate,
+        SalesOffersEdit,
+        SalesOffersSubmit,
+        SalesOffersAutoApprove,
+        SalesOffersCancel
+    ];
+
+    public static readonly string[] SalesManager =
+    [
+        SalesVisitsView,
+        SalesOffersView,
+        SalesOffersApprove
+    ];
 
     public static readonly string[] CrmOperator =
     [
@@ -50,7 +82,9 @@ public static class Permissions
     [
         .. CrmOperator,
         CrmCustomersMerge,
-        CrmLeadsAssign
+        CrmLeadsAssign,
+        .. SalesOperator,
+        .. SalesManager
     ];
 
     public static readonly string[] QualityManager =

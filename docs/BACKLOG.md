@@ -1,5 +1,17 @@
 # Backlog
 
+## Готово в коде — итерация 0.7
+
+- календарь визитов, reschedule/arrival/result и безопасный test-drive check-out/check-in;
+- PostgreSQL-защита от пересечения активных слотов автомобиля и ответственного менеджера;
+- серверный preview Offer из публичной цены, прозрачных строк, скидки и подтверждённой себестоимости;
+- контроль валюты, лимита скидки, минимальной маржи и запрет self-approval;
+- auto approval в пределах полномочий и отдельные idempotent manager decisions;
+- неизменяемый Approved Offer snapshot, история и новая ревизия;
+- permissions, audit, optimistic concurrency, tenant/branch isolation, unit/integration/component tests.
+
+Следующий scope: Reservation/Deal, оплата, договоры, выдача и итоговая экономика продажи. Эти функции намеренно не включены в 0.7.
+
 ## Готово — итерация 0.1
 
 - discovery, scope, KPI, допущения и риски;
@@ -50,12 +62,11 @@
 - настраиваемый first-response SLA, очередь просрочек и первое осмысленное действие;
 - idempotency, optimistic concurrency, permissions и cross-tenant negative tests.
 
-## Следующая итерация 0.7 — продажа и выдача
+## Следующая продуктовая граница
 
-1. Тест-драйв и история результата.
-2. Offer, скидка и независимое согласование.
-3. Временная бронь с конкурентной защитой и истечением.
-4. Deal snapshot, оплата, выдача и итоговая экономика plan/fact.
+1. Временная бронь с конкурентной защитой и истечением.
+2. Deal snapshot, оплата, договоры и выдача.
+3. Итоговая экономика plan/fact по завершённой продаже.
 
 ## Позже по MVP
 

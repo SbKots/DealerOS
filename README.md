@@ -1,6 +1,8 @@
 # DealerOS
 
-DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.6 добавляет tenant-aware реестр клиентов, безопасную работу с дублями, единый inbox лидов, детерминированное назначение, activity timeline и измеримый SLA первого осмысленного ответа.
+> Текущий сквозной релиз 0.7 добавляет визиты и test drive, серверный расчёт предложения, контроль скидки и маржи, независимое согласование и неизменяемый snapshot утверждённого Offer. Подробности: [docs/ITERATION_0.7.md](docs/ITERATION_0.7.md).
+
+DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.7 связывает подготовленный автомобиль и квалифицированный лид с визитом, test drive и экономически контролируемым утверждённым предложением.
 
 ## Быстрый запуск
 
@@ -68,7 +70,7 @@ Integration tests используют настоящий PostgreSQL в Testcont
 
 - `apps/api` — composition root, HTTP API, EF Core, JWT, миграции и адаптеры;
 - `apps/web` — React/TypeScript интерфейс и Playwright e2e;
-- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles, Inspections, Reconditioning, Operations и CRM;
+- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles, Inspections, Reconditioning, Operations, CRM и Sales;
 - `tests` — backend unit и PostgreSQL integration tests;
 - `docs` — продукт, архитектура, решения, безопасность, demo и backlog;
 - `compose.yaml` — воспроизводимое локальное окружение;
