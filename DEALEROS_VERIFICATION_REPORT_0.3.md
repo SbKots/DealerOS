@@ -9,10 +9,11 @@
 - branch: `codex/reconditioning-plan-0.3`;
 - base `origin/master`: `3a3ed8b2d98e743beec2d8ca819acbf9c7740b37`;
 - product commit: `38aa9302da6649fd06294230540b8f5bbab37e62`;
-- финальный test-only fixture/runner fix: `79a93897e243528d60f73f964b1ca1fcbb3f6cef`;
-- проверенный code HEAD: `79a93897e243528d60f73f964b1ca1fcbb3f6cef`;
+- shared PostgreSQL fixture commit: `e3affb819660584304f7cb1fce16be1272084549`;
+- финальный test-only fixture/runner/diagnostics HEAD: `986c4be9ef53be41737b775c068e5fb3f993c185`;
+- проверенный code HEAD: `986c4be9ef53be41737b775c068e5fb3f993c185`;
 - product commit присутствует в ancestry проверенного HEAD;
-- успешный GitHub Actions run: [29256478341](https://github.com/SbKots/DealerOS/actions/runs/29256478341).
+- успешный GitHub Actions run: [29260829492](https://github.com/SbKots/DealerOS/actions/runs/29260829492).
 
 ## Проверенный вертикальный сценарий
 
@@ -47,16 +48,16 @@ dotnet test DealerOS.slnx -c Release --no-build --logger trx --results-directory
 ### Два обязательных integration-прогона после fixture fix
 
 ```powershell
-dotnet test tests\DealerOS.IntegrationTests\DealerOS.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=integration-runner-config-run-1.trx" --results-directory TestResults\integration-runner-config-run-1
-dotnet test tests\DealerOS.IntegrationTests\DealerOS.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=integration-runner-config-run-2.trx" --results-directory TestResults\integration-runner-config-run-2
+dotnet test tests/DealerOS.IntegrationTests/DealerOS.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=integration-fixture-final-run-1.trx" --results-directory TestResults/integration-fixture-final-run-1
+dotnet test tests/DealerOS.IntegrationTests/DealerOS.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=integration-fixture-final-run-2.trx" --results-directory TestResults/integration-fixture-final-run-2
 ```
 
 - run 1: 21/21 passed, 1 min 44 sec;
-- run 2: 21/21 passed, 1 min 49 sec.
+- run 2: 21/21 passed, 1 min 42 sec.
 
 ### Способ очистки PostgreSQL между тестами
 
-`ReconditioningPostgresFixture` создаёт один PostgreSQL Testcontainer на весь `ReconditioningApiTests` и уничтожает его после завершения collection. Класс помечен collection `Reconditioning PostgreSQL` с `DisableParallelization = true`. Дополнительно `tests/DealerOS.IntegrationTests/xunit.runner.json` задаёт `parallelizeTestCollections: false` и `maxParallelThreads: 1` для одного integration test assembly; проект явно копирует конфиг в build output. Это делает уже существующий assembly-level запрет параллельности фактически применяемым Linux VSTest adapter и исключает одновременный запуск множества PostgreSQL/MinIO Testcontainers.
+`ReconditioningPostgresFixture` лениво создаёт один PostgreSQL Testcontainer на весь collection/class `ReconditioningApiTests` и уничтожает его в `DisposeAsync` после завершения тестов. Каждый test method получает lease на fixture; lease удерживается до конца тела теста, поэтому очистка и использование общей БД не пересекаются. Класс помечен collection `Reconditioning PostgreSQL` с `DisableParallelization = true`. Дополнительно `tests/DealerOS.IntegrationTests/xunit.runner.json` задаёт `parallelizeTestCollections: false` и `maxParallelThreads: 1` только для integration test assembly; проект явно копирует конфиг в build output. Стабильная версия VSTest adapter закреплена только в `DealerOS.IntegrationTests.csproj`.
 
 Перед каждым test method fixture подключается к служебной БД `postgres` и выполняет:
 
@@ -65,7 +66,7 @@ DROP DATABASE IF EXISTS "dealeros_reconditioning_tests" WITH (FORCE);
 CREATE DATABASE "dealeros_reconditioning_tests";
 ```
 
-Очистка не удаляет отдельные application-таблицы и не изменяет `__EFMigrationsHistory` частично: целевая тестовая БД пересоздаётся целиком, а application schemas и `__EFMigrationsHistory` заново создаются штатными EF migrations. Каждый тест получает чистое состояние и не зависит от порядка выполнения.
+Очистка не удаляет отдельные application-таблицы и не изменяет `__EFMigrationsHistory` частично: целевая тестовая БД пересоздаётся целиком, а application schemas и `__EFMigrationsHistory` заново создаются штатными EF migrations. Служебная БД `postgres` не изменяется. Каждый тест получает чистое состояние и не зависит от порядка выполнения.
 
 Изменены только:
 
@@ -152,35 +153,38 @@ docker compose up --build
 ### CI/TEST: нестабильный lifecycle PostgreSQL Testcontainers
 
 - исходный failed run: [29250990006](https://github.com/SbKots/DealerOS/actions/runs/29250990006);
-- промежуточные failed runs, выявившие конкурентный lifecycle/reset: [29254155387](https://github.com/SbKots/DealerOS/actions/runs/29254155387), [29254725299](https://github.com/SbKots/DealerOS/actions/runs/29254725299) и [29255780590](https://github.com/SbKots/DealerOS/actions/runs/29255780590);
+- промежуточные failed runs, выявившие конкурентный lifecycle/reset и несовпадение поведения VSTest adapter: [29254155387](https://github.com/SbKots/DealerOS/actions/runs/29254155387), [29254725299](https://github.com/SbKots/DealerOS/actions/runs/29254725299), [29255780590](https://github.com/SbKots/DealerOS/actions/runs/29255780590), [29256805291](https://github.com/SbKots/DealerOS/actions/runs/29256805291), [29257619499](https://github.com/SbKots/DealerOS/actions/runs/29257619499), [29258183321](https://github.com/SbKots/DealerOS/actions/runs/29258183321), [29258836629](https://github.com/SbKots/DealerOS/actions/runs/29258836629) и [29260006715](https://github.com/SbKots/DealerOS/actions/runs/29260006715);
 - воспроизводящая команда: оба полных запуска integration assembly, приведённые выше;
 - затронутые тесты: `tests/DealerOS.IntegrationTests/ReconditioningApiTests.cs`;
 - fixture: `tests/DealerOS.IntegrationTests/ReconditioningPostgresFixture.cs`;
 - начальный shared-container commit: `e3affb819660584304f7cb1fce16be1272084549`;
 - промежуточная сериализация reset: `8be932b18ca90a706415c1f9ee76dd89a83e431a`;
 - fixture isolation commit: `9e5a0ceea8c35a09a6db7da032d935bae9e0e585`;
-- финальный runner config fix commit: `79a93897e243528d60f73f964b1ca1fcbb3f6cef`;
-- исправление: один collection fixture на класс, полное пересоздание target database перед каждым тестом и явная последовательная конфигурация только integration test assembly;
-- успешный повторный run: [29256478341](https://github.com/SbKots/DealerOS/actions/runs/29256478341).
+- integration assembly runner config commit: `79a93897e243528d60f73f964b1ca1fcbb3f6cef`;
+- VSTest adapter compatibility commit: `ed6647e905963a27772a8b639fa65c70c726f186`;
+- bounded container diagnostics commits: `94481a454eb593e25352ac91fc491803f21abc4c` и `986c4be9ef53be41737b775c068e5fb3f993c185`;
+- исправление: один collection fixture на класс, lease на полное тело каждого теста, полное пересоздание target database перед каждым тестом и явная последовательная конфигурация только integration test assembly;
+- успешный повторный run: [29260829492](https://github.com/SbKots/DealerOS/actions/runs/29260829492).
 
 Открытых BLOCKER, CRITICAL и MAJOR после исправлений нет.
 
 ## GitHub Actions и artifacts
 
-Run [29256478341](https://github.com/SbKots/DealerOS/actions/runs/29256478341) на SHA `79a93897e243528d60f73f964b1ca1fcbb3f6cef`:
+Run [29260829492](https://github.com/SbKots/DealerOS/actions/runs/29260829492) на SHA `986c4be9ef53be41737b775c068e5fb3f993c185`:
 
 - backend — success: format, Release build, 26/26 unit, 21/21 integration;
 - frontend — success: audit, lint, 8/8 tests, build;
 - e2e — success: Compose stack и 4/4 Playwright;
-- `backend-test-results`, artifact ID `8281514570`, 97,247 bytes;
-- `frontend-test-results`, artifact ID `8281440281`, 839 bytes;
-- `frontend-build`, artifact ID `8281440637`, 114,025 bytes;
-- `playwright-report`, artifact ID `8281488045`, 209,142 bytes.
+- `backend-test-results`, artifact ID `8283337177`, 87,993 bytes;
+- `frontend-test-results`, artifact ID `8283264823`, 837 bytes;
+- `frontend-build`, artifact ID `8283265138`, 114,025 bytes;
+- `playwright-report`, artifact ID `8283310069`, 209,117 bytes.
 
 Локальные воспроизводимые результаты сохранены в игнорируемых Git каталогах:
 
-- `TestResults/integration-runner-config-run-1/integration-runner-config-run-1.trx`;
-- `TestResults/integration-runner-config-run-2/integration-runner-config-run-2.trx`;
+- `TestResults/integration-fixture-final-run-1/integration-fixture-final-run-1.trx`;
+- `TestResults/integration-fixture-final-run-2/integration-fixture-final-run-2.trx`;
+- `TestResults/ci-29260829492/*.trx`;
 - `apps/web/test-results/frontend-junit.xml`;
 - `apps/web/playwright-report/index.html`;
 - `apps/web/dist`.
