@@ -92,7 +92,8 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
 
         try
         {
-            diagnostics.Add($"ExitCode={await _postgres.GetExitCodeAsync(CancellationToken.None)}");
+            using var exitCodeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            diagnostics.Add($"ExitCode={await _postgres.GetExitCodeAsync(exitCodeTimeout.Token)}");
         }
         catch (Exception diagnosticException)
         {
