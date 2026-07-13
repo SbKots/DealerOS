@@ -60,19 +60,59 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
 
     private async Task ResetDatabaseAsync()
     {
-        var adminConnectionString = new NpgsqlConnectionStringBuilder(ConnectionString)
+        try
         {
-            Database = "postgres"
-        }.ConnectionString;
-        await using var connection = new NpgsqlConnection(adminConnectionString);
-        await connection.OpenAsync();
-        await using (var drop = new NpgsqlCommand(
-            $"DROP DATABASE IF EXISTS \"{DatabaseName}\" WITH (FORCE)", connection))
-        {
-            await drop.ExecuteNonQueryAsync();
+            var adminConnectionString = new NpgsqlConnectionStringBuilder(ConnectionString)
+            {
+                Database = "postgres"
+            }.ConnectionString;
+            await using var connection = new NpgsqlConnection(adminConnectionString);
+            await connection.OpenAsync();
+            await using (var drop = new NpgsqlCommand(
+                $"DROP DATABASE IF EXISTS \"{DatabaseName}\" WITH (FORCE)", connection))
+            {
+                await drop.ExecuteNonQueryAsync();
+            }
+            await using var create = new NpgsqlCommand($"CREATE DATABASE \"{DatabaseName}\"", connection);
+            await create.ExecuteNonQueryAsync();
         }
-        await using var create = new NpgsqlCommand($"CREATE DATABASE \"{DatabaseName}\"", connection);
-        await create.ExecuteNonQueryAsync();
+        catch (Exception exception)
+        {
+            throw await CreateContainerFailureAsync(exception);
+        }
+    }
+
+    private async Task<InvalidOperationException> CreateContainerFailureAsync(Exception exception)
+    {
+        var diagnostics = new List<string>
+        {
+            $"State={_postgres.State}",
+            $"Id={_postgres.Id}"
+        };
+
+        try
+        {
+            diagnostics.Add($"ExitCode={await _postgres.GetExitCodeAsync(CancellationToken.None)}");
+        }
+        catch (Exception diagnosticException)
+        {
+            diagnostics.Add($"ExitCode=unavailable ({diagnosticException.Message})");
+        }
+
+        try
+        {
+            var (stdout, stderr) = await _postgres.GetLogsAsync();
+            diagnostics.Add($"stdout={stdout}");
+            diagnostics.Add($"stderr={stderr}");
+        }
+        catch (Exception diagnosticException)
+        {
+            diagnostics.Add($"logs=unavailable ({diagnosticException.Message})");
+        }
+
+        return new InvalidOperationException(
+            $"Reconditioning PostgreSQL reset failed. {string.Join(Environment.NewLine, diagnostics)}",
+            exception);
     }
 
     public async Task DisposeAsync()
