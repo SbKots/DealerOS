@@ -19,6 +19,7 @@ React/Vite -> ASP.NET Core command endpoints -> application services -> aggregat
 - `Vehicles`: VIN, Money usage, агрегат Vehicle, переходы и use cases поступления.
 - `Inspections`: версионные шаблоны, агрегат Inspection, пункты, дефекты, метаданные фото и команды lifecycle.
 - `Reconditioning`: агрегат плана, работы, исключения обязательных дефектов, решения, бюджетные snapshots и ревизии.
+- `Operations`: исполнение утверждённого snapshot, заказ-работы, материалы, фактические расходы, перерасход, сроки и состояние расчёта с подрядчиком.
 - `SharedKernel`: только стабильные малые понятия и типы ошибок.
 - `apps/api/Infrastructure`: EF mappings по схемам `identity`, `organizations`, `vehicles`, `audit`; это адаптер, а не место бизнес-правил.
 
@@ -43,6 +44,10 @@ Submitted -- approve --> Approved
 Submitted -- reject --> Rejected
 Draft/Submitted/ChangesRequested -- cancel --> Cancelled
 Approved -- create-revision --> Draft(revision + 1)
+
+Execution Draft -- start --> InProgress -- complete(all mandatory work + budget decision) --> Completed
+Work Scheduled -- start --> InProgress -- block/resume --> Blocked/InProgress
+Work InProgress -- complete --> Completed -- return-for-rework --> ReturnedForRework
 ```
 
 `InspectionPassed` означает только техническое прохождение осмотра без дефектов, требующих подготовки или блокирующих продажу. Это не полная готовность к продаже: будущий `ReadyForSale` может быть установлен только после подготовки и контроля качества в следующем процессе. Повторный переход запрещён доменом. Универсального PATCH статуса нет. Каждое создание/принятие создаёт status history и audit event в одном `SaveChanges`.
@@ -62,6 +67,12 @@ Photo metadata correction-ревизии получает новый `Id`, со�
 Работы хранят labor и parts как `decimal(19,2) + currency`. Read model группирует разные валюты, а submit требует одну валюту, поэтому система никогда не складывает их молча. Удаление последней обязательной работы по дефекту требует причины и создаёт `defect_omission`. Approved создаёт отдельный неизменяемый `budget_snapshot` с плановой суммой и одобренным лимитом. Повтор decision ID идемпотентен; другой payload с тем же ID конфликтует. `Version` и составной unique constraint гарантируют один результат конкурентного согласования.
 
 Approved не редактируется. Новая ревизия копирует работы/обоснованные исключения в новый Draft, сохраняет ссылку `RevisesPlanId` и проходит повторное согласование. Исходный план, решение и snapshot остаются неизменными. Настройка организации `RequireIndependentReconditioningApproval` запрещает автору согласовать собственный план.
+
+## Исполнение подготовки
+
+`ReconditioningExecution` создаётся только из точного immutable `ApprovedBudgetSnapshot`; tenant-aware unique constraint разрешает одно исполнение snapshot. Заказ-работы получают snapshot состава плана и дальше изменяются отдельными командами, защищёнными `Version`. Фактические labor, material и external суммы хранятся как `decimal(19,2) + currency`; расход и возврат материала — идемпотентные движения с отдельным command ID.
+
+Завершение требует исполнения всех обязательных работ, урегулированного внешнего расчёта и отдельного решения при превышении лимита. Решение о перерасходе идемпотентно по decision ID, не может менять валюту и при включённом независимом согласовании недоступно автору execution. Фоновый worker с отложенным первым циклом создаёт tenant-aware дедуплицированные уведомления `DueSoon/Overdue`; ручная команда оставлена для демонстрации и детерминированных тестов.
 
 ## Данные
 

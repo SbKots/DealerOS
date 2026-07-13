@@ -1,5 +1,6 @@
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Domain;
+using DealerOS.Modules.Operations.Domain;
 using DealerOS.Modules.Organizations;
 using DealerOS.Modules.Reconditioning.Domain;
 using DealerOS.Modules.Vehicles.Domain;
@@ -29,6 +30,11 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
     public DbSet<ReconditioningDecision> ReconditioningDecisions => Set<ReconditioningDecision>();
     public DbSet<ReconditioningBudgetSnapshot> ReconditioningBudgetSnapshots => Set<ReconditioningBudgetSnapshot>();
     public DbSet<ReconditioningPlanHistory> ReconditioningPlanHistory => Set<ReconditioningPlanHistory>();
+    public DbSet<ReconditioningExecution> ReconditioningExecutions => Set<ReconditioningExecution>();
+    public DbSet<ExecutionWorkOrder> ExecutionWorkOrders => Set<ExecutionWorkOrder>();
+    public DbSet<WorkOrderMaterialMovement> WorkOrderMaterialMovements => Set<WorkOrderMaterialMovement>();
+    public DbSet<ExecutionOverrunDecision> ExecutionOverrunDecisions => Set<ExecutionOverrunDecision>();
+    public DbSet<ExecutionNotification> ExecutionNotifications => Set<ExecutionNotification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -400,6 +406,8 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id })
+                .HasName("ak_reconditioning_works_organization_id");
             entity.Property(x => x.SourceDefectTitle).HasMaxLength(300).IsRequired();
             entity.Property(x => x.SourceDefectDescription).HasMaxLength(4000).IsRequired();
             entity.Property(x => x.SourceDefectSeverity).HasMaxLength(30).IsRequired();
@@ -473,6 +481,8 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id })
+                .HasName("ak_reconditioning_budget_snapshots_organization_id");
             entity.Property(x => x.LaborAmount).HasPrecision(19, 2);
             entity.Property(x => x.PartsAmount).HasPrecision(19, 2);
             entity.Property(x => x.PlannedTotalAmount).HasPrecision(19, 2);
@@ -506,6 +516,173 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             entity.HasOne<UserAccount>().WithMany()
                 .HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
                 .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReconditioningExecution>(entity =>
+        {
+            entity.ToTable("executions", "operations", table =>
+            {
+                table.HasCheckConstraint("ck_operations_executions_status", "\"Status\" IN (1, 2, 3, 4, 5)");
+                table.HasCheckConstraint("ck_operations_executions_amounts",
+                    "\"PlannedAmount\" >= 0 AND \"ApprovedLimitAmount\" >= 0");
+                table.HasCheckConstraint("ck_operations_executions_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+                table.HasCheckConstraint("ck_operations_executions_version", "\"Version\" > 0");
+                table.HasCheckConstraint("ck_operations_executions_timestamps",
+                    "(\"Status\" = 1 AND \"StartedAt\" IS NULL AND \"CompletedAt\" IS NULL) OR " +
+                    "(\"Status\" IN (2, 3) AND \"StartedAt\" IS NOT NULL AND \"CompletedAt\" IS NULL) OR " +
+                    "(\"Status\" = 4 AND \"StartedAt\" IS NOT NULL AND \"CompletedAt\" IS NOT NULL) OR " +
+                    "(\"Status\" = 5 AND \"CompletedAt\" IS NULL)");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id })
+                .HasName("ak_operations_executions_organization_id");
+            entity.Property(x => x.PlannedAmount).HasPrecision(19, 2);
+            entity.Property(x => x.ApprovedLimitAmount).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.Ignore(x => x.ActualLaborAmount);
+            entity.Ignore(x => x.ActualMaterialAmount);
+            entity.Ignore(x => x.ActualExternalAmount);
+            entity.Ignore(x => x.ActualTotalAmount);
+            entity.Ignore(x => x.VarianceAmount);
+            entity.HasIndex(x => new { x.OrganizationId, x.BudgetSnapshotId }).IsUnique()
+                .HasDatabaseName("ux_operations_execution_snapshot");
+            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId, x.Status, x.UpdatedAt })
+                .HasDatabaseName("ix_operations_execution_vehicle_status");
+            entity.HasOne<Vehicle>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Branch>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ReconditioningPlan>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.PlanId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ReconditioningBudgetSnapshot>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.BudgetSnapshotId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.WorkOrders).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.OverrunDecisions).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.Notifications).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ExecutionWorkOrder>(entity =>
+        {
+            entity.ToTable("work_orders", "operations", table =>
+            {
+                table.HasCheckConstraint("ck_operations_work_orders_status", "\"Status\" BETWEEN 1 AND 6");
+                table.HasCheckConstraint("ck_operations_work_orders_settlement", "\"SettlementStatus\" BETWEEN 1 AND 6");
+                table.HasCheckConstraint("ck_operations_work_orders_amounts",
+                    "\"PlannedLaborAmount\" >= 0 AND \"PlannedPartsAmount\" >= 0 AND " +
+                    "\"ActualLaborHours\" >= 0 AND \"ActualLaborAmount\" >= 0 AND \"ActualExternalAmount\" >= 0");
+                table.HasCheckConstraint("ck_operations_work_orders_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id })
+                .HasName("ak_operations_work_orders_organization_id");
+            entity.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.ExecutorType).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.AssigneeName).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.PlannedLaborAmount).HasPrecision(19, 2);
+            entity.Property(x => x.PlannedPartsAmount).HasPrecision(19, 2);
+            entity.Property(x => x.ActualLaborHours).HasPrecision(19, 2);
+            entity.Property(x => x.ActualLaborAmount).HasPrecision(19, 2);
+            entity.Property(x => x.ActualExternalAmount).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.ContractorName).HasMaxLength(300);
+            entity.Property(x => x.InvoiceReference).HasMaxLength(200);
+            entity.Property(x => x.SettlementComment).HasMaxLength(2000);
+            entity.Property(x => x.BlockReason).HasMaxLength(2000);
+            entity.Property(x => x.CompletionComment).HasMaxLength(2000);
+            entity.Ignore(x => x.MaterialAmount);
+            entity.HasIndex(x => new { x.OrganizationId, x.ExecutionId, x.SourcePlanWorkId }).IsUnique()
+                .HasDatabaseName("ux_operations_work_order_plan_work");
+            entity.HasIndex(x => new { x.OrganizationId, x.DueAt, x.Status })
+                .HasDatabaseName("ix_operations_work_order_due_status");
+            entity.HasOne<ReconditioningExecution>().WithMany(x => x.WorkOrders)
+                .HasForeignKey(x => new { x.OrganizationId, x.ExecutionId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ReconditioningWork>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.SourcePlanWorkId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<InspectionDefect>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.SourceDefectId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.SettlementChangedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.Navigation(x => x.MaterialMovements).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<WorkOrderMaterialMovement>(entity =>
+        {
+            entity.ToTable("material_movements", "operations", table =>
+            {
+                table.HasCheckConstraint("ck_operations_material_type", "\"Type\" IN (1, 2)");
+                table.HasCheckConstraint("ck_operations_material_quantity", "\"Quantity\" > 0");
+                table.HasCheckConstraint("ck_operations_material_cost", "\"UnitCost\" >= 0");
+                table.HasCheckConstraint("ck_operations_material_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+            });
+            entity.HasKey(x => new { x.OrganizationId, x.WorkOrderId, x.Id });
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Name).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Quantity).HasPrecision(19, 3);
+            entity.Property(x => x.Unit).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.UnitCost).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.SupplierName).HasMaxLength(300);
+            entity.Ignore(x => x.SignedAmount);
+            entity.HasOne<ExecutionWorkOrder>().WithMany(x => x.MaterialMovements)
+                .HasForeignKey(x => new { x.OrganizationId, x.WorkOrderId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ExecutionOverrunDecision>(entity =>
+        {
+            entity.ToTable("overrun_decisions", "operations", table =>
+            {
+                table.HasCheckConstraint("ck_operations_overrun_amounts",
+                    "\"ActualAmount\" >= 0 AND \"ApprovedLimitAmount\" >= \"ActualAmount\"");
+                table.HasCheckConstraint("ck_operations_overrun_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+            });
+            entity.HasKey(x => new { x.OrganizationId, x.ExecutionId, x.Id });
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.ActualAmount).HasPrecision(19, 2);
+            entity.Property(x => x.ApprovedLimitAmount).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(2000).IsRequired();
+            entity.HasOne<ReconditioningExecution>().WithMany(x => x.OverrunDecisions)
+                .HasForeignKey(x => new { x.OrganizationId, x.ExecutionId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ExecutionNotification>(entity =>
+        {
+            entity.ToTable("notifications", "operations", table =>
+                table.HasCheckConstraint("ck_operations_notification_type", "\"Type\" IN (1, 2)"));
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.DeduplicationKey).HasMaxLength(150).IsRequired();
+            entity.HasIndex(x => new { x.OrganizationId, x.DeduplicationKey }).IsUnique()
+                .HasDatabaseName("ux_operations_notification_deduplication");
+            entity.HasOne<ReconditioningExecution>().WithMany(x => x.Notifications)
+                .HasForeignKey(x => new { x.OrganizationId, x.ExecutionId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ExecutionWorkOrder>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.WorkOrderId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

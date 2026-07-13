@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { api, ApiError, clearSession, getSession, hasSession, saveSession, sessionExpiredEvent, type Session } from './api'
 import { InspectionsWorkspace } from './Inspections'
 import { ReconditioningWorkspace } from './Reconditioning'
+import { OperationsWorkspace } from './Operations'
 import './App.css'
 
 const intakeSchema = z.object({
@@ -36,7 +37,7 @@ export default function App() {
   const queryClient = useQueryClient()
   const [authenticated, setAuthenticated] = useState(hasSession())
   const [selected, setSelected] = useState<Vehicle | null>(null)
-  const [view, setView] = useState<'intake' | 'inspections' | 'reconditioning'>('intake')
+  const [view, setView] = useState<'intake' | 'inspections' | 'reconditioning' | 'operations'>('intake')
   const [inspectionVehicle, setInspectionVehicle] = useState<Vehicle | null>(null)
   const [email, setEmail] = useState('admin@volga-auto.demo')
   const [password, setPassword] = useState('DealerOS!2026')
@@ -109,13 +110,14 @@ export default function App() {
         <button className={view === 'intake' ? 'active' : ''} onClick={() => setView('intake')}>Приёмка</button>
         {session?.permissions?.includes('vehicles.inspections.view') && <button className={view === 'inspections' ? 'active' : ''} onClick={() => { setInspectionVehicle(null); setView('inspections') }}>Осмотры</button>}
         {session?.permissions?.includes('reconditioning.view') && <button className={view === 'reconditioning' ? 'active' : ''} onClick={() => setView('reconditioning')}>Подготовка</button>}
+        {session?.permissions?.includes('operations.view') && <button className={view === 'operations' ? 'active' : ''} onClick={() => setView('operations')}>Выполнение</button>}
       </nav>
       <div className="context-pill"><span className="pulse" />{session?.organizationName} · {session?.branchName}</div>
       <button className="link-button" onClick={() => { clearSession(); setView('intake'); setAuthenticated(false); queryClient.clear() }}>Выйти</button>
     </header>
 
     <main className="workspace">
-      {view === 'inspections' ? <InspectionsWorkspace focusVehicle={inspectionVehicle} onClearFocus={() => setInspectionVehicle(null)} /> : view === 'reconditioning' ? <ReconditioningWorkspace /> : <>
+      {view === 'inspections' ? <InspectionsWorkspace focusVehicle={inspectionVehicle} onClearFocus={() => setInspectionVehicle(null)} /> : view === 'reconditioning' ? <ReconditioningWorkspace /> : view === 'operations' ? <OperationsWorkspace /> : <>
       <div className="page-heading">
         <div><p className="eyebrow">Склад автомобилей</p><h1>Приём автомобиля</h1><p className="muted">Создайте цифровой паспорт, затем подтвердите фактическую приёмку на площадку.</p></div>
         <div className="metric"><span>На контроле</span><strong>{vehicles.data?.filter((x) => x.status === 'IntakeDraft').length ?? 0}</strong><small>черновиков поступления</small></div>

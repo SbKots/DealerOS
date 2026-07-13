@@ -17,6 +17,27 @@ public static class Permissions
     public const string ReconditioningSubmit = "reconditioning.submit";
     public const string ReconditioningApprove = "reconditioning.approve";
     public const string ReconditioningCancel = "reconditioning.cancel";
+    public const string OperationsView = "operations.view";
+    public const string OperationsCreate = "operations.create";
+    public const string OperationsEdit = "operations.edit";
+    public const string OperationsComplete = "operations.complete";
+    public const string OperationsApproveOverrun = "operations.approve_overrun";
+    public const string OperationsManageSettlement = "operations.manage_settlement";
+
+    public static readonly string[] OperationsOperator =
+    [
+        OperationsView,
+        OperationsCreate,
+        OperationsEdit,
+        OperationsComplete
+    ];
+
+    public static readonly string[] OperationsManager =
+    [
+        OperationsView,
+        OperationsApproveOverrun,
+        OperationsManageSettlement
+    ];
 
     public static readonly string[] ReconditioningOperator =
     [
@@ -51,6 +72,8 @@ public static class Permissions
         .. InspectionOperator,
         VehicleInspectionsManageTemplates,
         .. ReconditioningOperator,
-        ReconditioningApprove
+        ReconditioningApprove,
+        .. OperationsOperator,
+        .. OperationsManager
     ];
 }

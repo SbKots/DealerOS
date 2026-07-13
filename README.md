@@ -1,6 +1,6 @@
 # DealerOS
 
-DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.3 связывает завершённый осмотр с планом предпродажной подготовки: обязательные дефекты, работы, плановый бюджет, очередь руководителя, неизменяемое решение и ревизии под tenant/branch isolation.
+DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.4 превращает утверждённый план предпродажной подготовки в исполнение: заказ-работы, фактические трудовые/материальные/внешние затраты, перерасход, сроки и расчёты с подрядчиками под tenant/branch isolation.
 
 ## Быстрый запуск
 
@@ -41,6 +41,7 @@ API в Development применяет миграции и идемпотентн
 - `Database__SeedDemo` — демонстрационные организации и пользователи.
 - `ObjectStorage__Endpoint`, `AccessKey`, `SecretKey`, `Bucket`, `UseSsl` — приватное S3-compatible хранилище фотографий;
 - `ObjectStorage__EnsureBucket` — создание bucket при старте только для Development/тестов.
+- `Operations__DeadlineWorkerEnabled`, `Operations__DeadlineWorkerIntervalMinutes` — фоновый tenant-aware контроль близких и просроченных сроков работ.
 
 Диагностика: `/health/live` проверяет процесс, `/health/ready` — PostgreSQL и object storage, `/health` сохранён как совмещённая проверка.
 
@@ -65,7 +66,7 @@ Integration tests используют настоящий PostgreSQL в Testcont
 
 - `apps/api` — composition root, HTTP API, EF Core, JWT, миграции и адаптеры;
 - `apps/web` — React/TypeScript интерфейс и Playwright e2e;
-- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles, Inspections и Reconditioning;
+- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles, Inspections, Reconditioning и Operations;
 - `tests` — backend unit и PostgreSQL integration tests;
 - `docs` — продукт, архитектура, решения, безопасность, demo и backlog;
 - `compose.yaml` — воспроизводимое локальное окружение;

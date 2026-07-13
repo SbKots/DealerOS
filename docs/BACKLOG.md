@@ -25,13 +25,20 @@
 - новая ревизия утверждённого плана, сравнение и read-only история;
 - tenant-aware constraints, optimistic concurrency, audit, PostgreSQL/component/Playwright tests.
 
-## Следующая итерация 0.4 — выполнение подготовки
+## Готово в коде — итерация 0.4
 
-1. Фактическое выполнение работ и заказ-наряды.
-2. Склад/резерв/списание запчастей и фактические расходы.
-3. Контроль качества и переход к полной `ReadyForSale`.
-4. Расчёты с подрядчиками и план/факт отклонения бюджета.
-5. Уведомления по срокам и просрочкам.
+- execution из неизменяемого утверждённого snapshot и заказ-работы;
+- фактические labor/material/external расходы и возвраты материалов;
+- блокировка, сроки, уведомления, подрядчики и settlement status;
+- план/лимит/факт/variance и отдельное идемпотентное решение о перерасходе;
+- tenant-aware constraints, optimistic concurrency, аудит и PostgreSQL/component tests.
+
+## Следующая итерация 0.5 — контроль качества и публикационная готовность
+
+1. QC gate, замечания и повторные работы.
+2. Переход в полную `ReadyForSale` только после успешного QC.
+3. Media/content completeness и immutable listing snapshot.
+4. Ручной export/publication journal без внешней интеграции.
 
 ## Позже по MVP
 
