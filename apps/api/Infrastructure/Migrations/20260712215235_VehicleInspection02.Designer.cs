@@ -3,6 +3,7 @@ using System;
 using DealerOS.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DealerOS.Api.Infrastructure.Migrations
 {
     [DbContext(typeof(DealerOsDbContext))]
-    partial class DealerOsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260712215235_VehicleInspection02")]
+    partial class VehicleInspection02
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -365,23 +368,6 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DealerOS.Modules.Inspections.Domain.InspectionObjectDeletion", b =>
-                {
-                    b.Property<Guid>("OrganizationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ObjectKey")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("OrganizationId", "ObjectKey");
-
-                    b.ToTable("object_deletion_queue", "inspections");
-                });
-
             modelBuilder.Entity("DealerOS.Modules.Inspections.Domain.InspectionPhoto", b =>
                 {
                     b.Property<Guid>("Id")
@@ -417,22 +403,15 @@ namespace DealerOS.Api.Infrastructure.Migrations
                     b.Property<long>("SizeBytes")
                         .HasColumnType("bigint");
 
-                    b.Property<Guid?>("SourcePhotoId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("OrganizationId", "Id")
-                        .HasName("ak_inspection_photos_organization_id");
+                    b.HasIndex("ObjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_inspection_photos_object_key");
 
                     b.HasIndex("OrganizationId", "CreatedByUserId");
 
                     b.HasIndex("OrganizationId", "DefectId");
-
-                    b.HasIndex("OrganizationId", "ObjectKey")
-                        .HasDatabaseName("ix_inspection_photos_tenant_object_key");
-
-                    b.HasIndex("OrganizationId", "SourcePhotoId");
 
                     b.ToTable("photos", "inspections", t =>
                         {
@@ -816,15 +795,6 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("DealerOS.Modules.Inspections.Domain.InspectionObjectDeletion", b =>
-                {
-                    b.HasOne("DealerOS.Modules.Organizations.Organization", null)
-                        .WithMany()
-                        .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("DealerOS.Modules.Inspections.Domain.InspectionPhoto", b =>
                 {
                     b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
@@ -840,12 +810,6 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("DealerOS.Modules.Inspections.Domain.InspectionPhoto", null)
-                        .WithMany()
-                        .HasForeignKey("OrganizationId", "SourcePhotoId")
-                        .HasPrincipalKey("OrganizationId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DealerOS.Modules.Inspections.Domain.InspectionTemplate", b =>

@@ -20,6 +20,7 @@ test('employee creates an intake and accepts the vehicle to stock', async ({ pag
   await expect(page.getByText(vin).first()).toBeVisible()
   await page.reload()
   await expect(page.getByText(vin).first()).toBeVisible()
+  await page.getByRole('row').filter({ hasText: vin }).click()
   await page.getByRole('button', { name: /Принять на склад/ }).click()
   const success = page.getByRole('status')
   await expect(success).toContainText('Автомобиль принят на склад')

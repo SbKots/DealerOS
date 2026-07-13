@@ -1,9 +1,11 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using DealerOS.Api.Auth;
 using DealerOS.Api.Endpoints;
 using DealerOS.Api.Infrastructure;
 using DealerOS.Modules.IdentityAccess;
+using DealerOS.Modules.Inspections.Application;
 using DealerOS.Modules.Vehicles.Application;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -11,6 +13,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Minio;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,13 +24,16 @@ if (builder.Environment.IsProduction() && configuredJwtKey.StartsWith("local-", 
 }
 
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 builder.Services.AddOpenApiDocument(options =>
 {
     options.Title = "DealerOS API";
     options.Version = "v1";
 });
-builder.Services.AddHealthChecks().AddDbContextCheck<DealerOsDbContext>(tags: ["ready"]);
+builder.Services.AddHealthChecks().AddDbContextCheck<DealerOsDbContext>(tags: ["ready"])
+    .AddCheck<ObjectStorageHealthCheck>("object_storage", tags: ["ready"]);
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .WithOrigins("http://localhost:5173", "http://localhost:4173")
     .AllowAnyHeader().AllowAnyMethod()));
@@ -53,6 +59,22 @@ builder.Services.AddScoped<IAuditWriter>(sp => sp.GetRequiredService<VehicleStor
 builder.Services.AddScoped<VehicleIntakeService>();
 builder.Services.AddScoped<IPasswordHasher<UserAccount>, PasswordHasher<UserAccount>>();
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<InspectionStore>();
+builder.Services.AddScoped<IInspectionStore>(sp => sp.GetRequiredService<InspectionStore>());
+builder.Services.AddScoped<IInspectionPhotoStorage, MinioInspectionPhotoStorage>();
+builder.Services.AddScoped<IInspectionImageProcessor, InspectionImageProcessor>();
+builder.Services.AddScoped<InspectionService>();
+builder.Services.AddSingleton<IMinioClient>(_ =>
+{
+    var endpoint = builder.Configuration["ObjectStorage:Endpoint"]
+        ?? throw new InvalidOperationException("ObjectStorage:Endpoint is not configured.");
+    var accessKey = builder.Configuration["ObjectStorage:AccessKey"]
+        ?? throw new InvalidOperationException("ObjectStorage:AccessKey is not configured.");
+    var secretKey = builder.Configuration["ObjectStorage:SecretKey"]
+        ?? throw new InvalidOperationException("ObjectStorage:SecretKey is not configured.");
+    return new MinioClient().WithEndpoint(endpoint).WithCredentials(accessKey, secretKey)
+        .WithSSL(builder.Configuration.GetValue("ObjectStorage:UseSsl", false)).Build();
+});
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme).Configure<IConfiguration>((options, configuration) =>
@@ -135,6 +157,12 @@ if (app.Configuration.GetValue("Database:ApplyMigrations", false))
     }
 }
 
+if (app.Configuration.GetValue("ObjectStorage:EnsureBucket", false))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    await scope.ServiceProvider.GetRequiredService<IInspectionPhotoStorage>().EnsureBucketAsync(CancellationToken.None);
+}
+
 if (app.Environment.IsDevelopment()) app.UseOpenApi();
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
@@ -142,6 +170,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check 
 app.MapAuthEndpoints();
 app.MapOrganizationEndpoints();
 app.MapVehicleEndpoints();
+app.MapInspectionEndpoints();
 app.Run();
 
 public partial class Program;

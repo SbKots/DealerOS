@@ -3,5 +3,8 @@ namespace DealerOS.Modules.Vehicles.Domain;
 public enum VehicleStatus
 {
     IntakeDraft = 1,
-    InStock = 2
+    InStock = 2,
+    InspectionInProgress = 3,
+    ReconditioningRequired = 4,
+    InspectionPassed = 5
 }

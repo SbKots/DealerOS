@@ -49,3 +49,29 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   }
   return response.json() as Promise<T>
 }
+
+export async function apiForm<T>(path: string, body: FormData): Promise<T> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: getSession()?.accessToken ? { Authorization: `Bearer ${getSession()!.accessToken}` } : {},
+    body,
+  })
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({})) as { title?: string; code?: string }
+    if (response.status === 401) expireSession()
+    throw new ApiError(problem.title ?? `Ошибка HTTP ${response.status}`, response.status, problem.code)
+  }
+  return response.json() as Promise<T>
+}
+
+export async function apiBlob(path: string): Promise<Blob> {
+  const response = await fetch(path, {
+    headers: getSession()?.accessToken ? { Authorization: `Bearer ${getSession()!.accessToken}` } : {},
+  })
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({})) as { title?: string; code?: string }
+    if (response.status === 401) expireSession()
+    throw new ApiError(problem.title ?? `Ошибка HTTP ${response.status}`, response.status, problem.code)
+  }
+  return response.blob()
+}

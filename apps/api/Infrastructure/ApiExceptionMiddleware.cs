@@ -26,9 +26,12 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
                 ConflictException conflict => (409, conflict.Message, conflict.Code),
                 ForbiddenException forbidden => (403, forbidden.Message, "forbidden"),
                 NotFoundException notFound => (404, notFound.Message, "not_found"),
+                BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge } =>
+                    (413, "Размер запроса превышает допустимый предел.", "payload_too_large"),
                 BadHttpRequestException => (400, "Тело запроса имеет неверный формат.", "invalid_request"),
                 JsonException => (400, "Тело запроса имеет неверный формат.", "invalid_json"),
                 DbUpdateConcurrencyException => (409, "Данные были изменены другим пользователем. Обновите страницу.", "concurrency_conflict"),
+                StorageUnavailableException => (503, "Хранилище фотографий временно недоступно.", "storage_unavailable"),
                 _ => (500, "Произошла внутренняя ошибка.", "internal_error")
             };
 

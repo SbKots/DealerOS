@@ -77,6 +77,43 @@ public sealed class Vehicle
         _statusHistory.Add(new VehicleStatusHistory(Guid.NewGuid(), Id, OrganizationId, previous, Status, now, actorUserId));
     }
 
+    public void BeginInspection(DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status != VehicleStatus.InStock)
+            throw new DomainException("vehicle.inspection_requires_in_stock", "Начать осмотр можно только для автомобиля на складе.");
+        TransitionTo(VehicleStatus.InspectionInProgress, now, actorUserId);
+    }
+
+    public void BeginInspectionCorrection(DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status is not (VehicleStatus.ReconditioningRequired or VehicleStatus.InspectionPassed))
+            throw new DomainException("vehicle.correction_invalid_status", "Корректировка недоступна для текущего статуса автомобиля.");
+        TransitionTo(VehicleStatus.InspectionInProgress, now, actorUserId);
+    }
+
+    public void CompleteInspection(bool needsReconditioning, DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status != VehicleStatus.InspectionInProgress)
+            throw new DomainException("vehicle.inspection_not_in_progress", "У автомобиля нет выполняемого осмотра.");
+        TransitionTo(needsReconditioning ? VehicleStatus.ReconditioningRequired : VehicleStatus.InspectionPassed,
+            now, actorUserId);
+    }
+
+    public void CancelInspection(DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status != VehicleStatus.InspectionInProgress)
+            throw new DomainException("vehicle.inspection_not_in_progress", "У автомобиля нет выполняемого осмотра.");
+        TransitionTo(VehicleStatus.InStock, now, actorUserId);
+    }
+
+    private void TransitionTo(VehicleStatus next, DateTimeOffset now, Guid actorUserId)
+    {
+        var previous = Status;
+        Status = next;
+        Version++;
+        _statusHistory.Add(new VehicleStatusHistory(Guid.NewGuid(), Id, OrganizationId, previous, next, now, actorUserId));
+    }
+
     private static string RequireText(string? value, int maxLength, string requiredMessage, string lengthMessage)
     {
         if (string.IsNullOrWhiteSpace(value)) throw new DomainException("vehicle.required_field", requiredMessage);

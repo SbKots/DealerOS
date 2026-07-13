@@ -1,5 +1,7 @@
 using DealerOS.Modules.IdentityAccess;
+using DealerOS.Modules.Inspections.Domain;
 using DealerOS.Modules.Organizations;
+using DealerOS.Modules.Vehicles.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,9 +14,12 @@ public static class DemoSeed
     public static readonly Guid VolgaSecondaryBranchId = Guid.Parse("11111111-1111-4111-8111-111111111102");
     public static readonly Guid VolgaAdminUserId = Guid.Parse("11111111-1111-4111-8111-111111111001");
     public static readonly Guid VolgaViewerUserId = Guid.Parse("11111111-1111-4111-8111-111111111002");
+    public static readonly Guid VolgaInspectorUserId = Guid.Parse("11111111-1111-4111-8111-111111111003");
     public static readonly Guid NorthOrganizationId = Guid.Parse("22222222-2222-4222-8222-222222222222");
     public static readonly Guid NorthBranchId = Guid.Parse("22222222-2222-4222-8222-222222222201");
     public static readonly Guid NorthAdminUserId = Guid.Parse("22222222-2222-4222-8222-222222222001");
+    public static readonly Guid VolgaTemplateId = Guid.Parse("11111111-1111-4111-8111-111111112001");
+    public static readonly Guid NorthTemplateId = Guid.Parse("22222222-2222-4222-8222-222222223001");
 
     public static async Task ApplyAsync(DealerOsDbContext db, IPasswordHasher<UserAccount> hasher, CancellationToken cancellationToken)
     {
@@ -36,6 +41,30 @@ public static class DemoSeed
             AddUser(db, hasher, VolgaViewerUserId, VolgaOrganizationId, VolgaBranchId, "viewer@volga-auto.demo", "Виктор Наблюдатель", [Permissions.VehiclesRead]);
         if (!await db.Users.AnyAsync(x => x.Id == NorthAdminUserId, cancellationToken))
             AddUser(db, hasher, NorthAdminUserId, NorthOrganizationId, NorthBranchId, "admin@north-auto.demo", "Николай Северин", Permissions.VehicleOperator);
+        if (!await db.Users.AnyAsync(x => x.Id == VolgaInspectorUserId, cancellationToken))
+            AddUser(db, hasher, VolgaInspectorUserId, VolgaOrganizationId, VolgaBranchId, "inspector@volga-auto.demo", "Дмитрий Диагност", Permissions.InspectionOperator);
+        await db.SaveChangesAsync(cancellationToken);
+
+        await EnsurePermissionsAsync(db, VolgaAdminUserId, Permissions.VehicleOperator, cancellationToken);
+        await EnsurePermissionsAsync(db, NorthAdminUserId, Permissions.VehicleOperator, cancellationToken);
+        await EnsurePermissionsAsync(db, VolgaInspectorUserId, Permissions.InspectionOperator, cancellationToken);
+
+        if (!await db.InspectionTemplates.AnyAsync(x => x.Id == VolgaTemplateId, cancellationToken))
+            db.InspectionTemplates.Add(CreateTemplate(VolgaTemplateId, VolgaOrganizationId, VolgaAdminUserId));
+        if (!await db.InspectionTemplates.AnyAsync(x => x.Id == NorthTemplateId, cancellationToken))
+            db.InspectionTemplates.Add(CreateTemplate(NorthTemplateId, NorthOrganizationId, NorthAdminUserId));
+
+        const string demoInspectionVin = "XTA210990Y0200001";
+        if (!await db.Vehicles.AnyAsync(x => x.OrganizationId == VolgaOrganizationId && x.Vin == demoInspectionVin,
+            cancellationToken))
+        {
+            var now = DateTimeOffset.UtcNow;
+            var vehicle = Vehicle.CreateDraft(VolgaOrganizationId, VolgaBranchId, demoInspectionVin, "Lada",
+                "Vesta", 2023, 31_500, new DealerOS.SharedKernel.Money(1_150_000m, "RUB"), now,
+                VolgaAdminUserId);
+            vehicle.AcceptToStock("MSK", now, VolgaAdminUserId);
+            db.Vehicles.Add(vehicle);
+        }
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -48,4 +77,32 @@ public static class DemoSeed
         user.GrantBranch(branchId);
         db.Users.Add(user);
     }
+
+    private static async Task EnsurePermissionsAsync(DealerOsDbContext db, Guid userId, IEnumerable<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var user = await db.Users.SingleAsync(x => x.Id == userId, cancellationToken);
+        user.SetPermissions(permissions);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static InspectionTemplate CreateTemplate(Guid id, Guid organizationId, Guid actorUserId) => new(id,
+        organizationId, "Базовый осмотр автомобиля", 1,
+        new[]
+        {
+            Item("body", InspectionCategory.Body, "Кузов", 10),
+            Item("interior", InspectionCategory.Interior, "Салон", 20),
+            Item("engine", InspectionCategory.Engine, "Двигатель", 30),
+            Item("transmission", InspectionCategory.Transmission, "Трансмиссия", 40),
+            Item("suspension", InspectionCategory.Suspension, "Подвеска", 50),
+            Item("brakes", InspectionCategory.Brakes, "Тормозная система", 60),
+            Item("steering", InspectionCategory.Steering, "Рулевое управление", 70),
+            Item("electrical", InspectionCategory.Electrical, "Электрика", 80),
+            Item("wheels", InspectionCategory.WheelsAndTires, "Колёса и шины", 90),
+            Item("documents", InspectionCategory.DocumentsAndEquipment, "Документы и комплектация", 100),
+            Item("test-drive", InspectionCategory.TestDrive, "Тест-драйв", 110)
+        }, DateTimeOffset.UtcNow, actorUserId);
+
+    private static InspectionTemplateItemDefinition Item(string key, InspectionCategory category, string label,
+        int sortOrder) => new(key, category, label, null, true, sortOrder);
 }
