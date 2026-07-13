@@ -1,4 +1,3 @@
-using DotNet.Testcontainers.Builders;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -13,7 +12,6 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
         .WithDatabase(DatabaseName)
         .WithUsername("dealeros")
         .WithPassword("dealeros")
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilCommandIsCompleted("pg_isready", "-U", "dealeros"))
         .Build();
 
     public string ConnectionString { get; private set; } = string.Empty;
