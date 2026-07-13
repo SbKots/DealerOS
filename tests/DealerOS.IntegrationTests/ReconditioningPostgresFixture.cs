@@ -8,6 +8,7 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
 {
     private const string DatabaseName = "dealeros_reconditioning_tests";
     private readonly SemaphoreSlim _startGate = new(1, 1);
+    private readonly SemaphoreSlim _testGate = new(1, 1);
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase(DatabaseName)
         .WithUsername("dealeros")
@@ -19,11 +20,22 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
 
     public Task InitializeAsync() => Task.CompletedTask;
 
-    public async Task PrepareDatabaseAsync()
+    public async Task BeginTestAsync()
     {
-        await EnsureStartedAsync();
-        await ResetDatabaseAsync();
+        await _testGate.WaitAsync();
+        try
+        {
+            await EnsureStartedAsync();
+            await ResetDatabaseAsync();
+        }
+        catch
+        {
+            _testGate.Release();
+            throw;
+        }
     }
+
+    public void CompleteTest() => _testGate.Release();
 
     private async Task EnsureStartedAsync()
     {
@@ -67,6 +79,7 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await _postgres.DisposeAsync();
+        _testGate.Dispose();
         _startGate.Dispose();
     }
 }

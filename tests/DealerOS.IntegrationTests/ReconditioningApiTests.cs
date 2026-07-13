@@ -15,10 +15,19 @@ namespace DealerOS.IntegrationTests;
 public sealed class ReconditioningApiTests(ReconditioningPostgresFixture database) : IAsyncLifetime
 {
     private readonly ReconditioningPostgresFixture _database = database;
+    private bool _testLeaseAcquired;
 
-    public Task InitializeAsync() => _database.PrepareDatabaseAsync();
+    public async Task InitializeAsync()
+    {
+        await _database.BeginTestAsync();
+        _testLeaseAcquired = true;
+    }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task DisposeAsync()
+    {
+        if (_testLeaseAcquired) _database.CompleteTest();
+        return Task.CompletedTask;
+    }
 
     [Fact]
     public async Task FullPlanWorkflow_IsAuditedApprovedImmutableAndTenantIsolated()
