@@ -12,26 +12,14 @@ using Microsoft.EntityFrameworkCore;
 namespace DealerOS.IntegrationTests;
 
 [Collection(ReconditioningPostgresCollection.Name)]
-public sealed class ReconditioningApiTests(ReconditioningPostgresFixture database) : IAsyncLifetime
+public sealed class ReconditioningApiTests(ReconditioningPostgresFixture database)
 {
     private readonly ReconditioningPostgresFixture _database = database;
-    private bool _testLeaseAcquired;
-
-    public async Task InitializeAsync()
-    {
-        await _database.BeginTestAsync();
-        _testLeaseAcquired = true;
-    }
-
-    public Task DisposeAsync()
-    {
-        if (_testLeaseAcquired) _database.CompleteTest();
-        return Task.CompletedTask;
-    }
 
     [Fact]
     public async Task FullPlanWorkflow_IsAuditedApprovedImmutableAndTenantIsolated()
     {
+        await using var databaseLease = await _database.BeginTestAsync();
         await using var factory = CreateFactory();
         using var preparer = factory.CreateClient();
         await AuthenticateAsync(preparer, "prep@volga-auto.demo");
@@ -157,6 +145,7 @@ public sealed class ReconditioningApiTests(ReconditioningPostgresFixture databas
     [Fact]
     public async Task ConcurrentApproval_ProducesOneDecisionAndRevisionPreservesApprovedSource()
     {
+        await using var databaseLease = await _database.BeginTestAsync();
         await using var factory = CreateFactory();
         var source = await CreateSubmittedPlanAsync(factory);
         using var managerA = factory.CreateClient();
@@ -207,6 +196,7 @@ public sealed class ReconditioningApiTests(ReconditioningPostgresFixture databas
     [Fact]
     public async Task ConcurrentApproval_SameDecisionIdWithDifferentPayload_ReturnsConflictForLosingCommand()
     {
+        await using var databaseLease = await _database.BeginTestAsync();
         await using var factory = CreateFactory();
         var source = await CreateSubmittedPlanAsync(factory);
         using var managerA = factory.CreateClient();
@@ -246,6 +236,7 @@ public sealed class ReconditioningApiTests(ReconditioningPostgresFixture databas
     [Fact]
     public async Task PermissionsBranchAndActivePlanConstraint_AreEnforced()
     {
+        await using var databaseLease = await _database.BeginTestAsync();
         await using var factory = CreateFactory();
         using var viewer = factory.CreateClient();
         await AuthenticateAsync(viewer, "viewer@volga-auto.demo");
@@ -285,6 +276,7 @@ public sealed class ReconditioningApiTests(ReconditioningPostgresFixture databas
     [Fact]
     public async Task Migration_UpgradesFrom02AndFreshDatabaseStartsWithDemoQueue()
     {
+        await using var databaseLease = await _database.BeginTestAsync();
         var options = new DbContextOptionsBuilder<DealerOsDbContext>().UseNpgsql(_database.ConnectionString).Options;
         await using (var db = new DealerOsDbContext(options))
             await db.Database.MigrateAsync("20260713083112_InspectionPhotoReliability02");

@@ -20,13 +20,14 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
 
     public Task InitializeAsync() => Task.CompletedTask;
 
-    public async Task BeginTestAsync()
+    public async Task<IAsyncDisposable> BeginTestAsync()
     {
         await _testGate.WaitAsync();
         try
         {
             await EnsureStartedAsync();
             await ResetDatabaseAsync();
+            return new TestLease(_testGate);
         }
         catch
         {
@@ -34,8 +35,6 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
             throw;
         }
     }
-
-    public void CompleteTest() => _testGate.Release();
 
     private async Task EnsureStartedAsync()
     {
@@ -81,6 +80,17 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
         await _postgres.DisposeAsync();
         _testGate.Dispose();
         _startGate.Dispose();
+    }
+
+    private sealed class TestLease(SemaphoreSlim gate) : IAsyncDisposable
+    {
+        private int _released;
+
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _released, 1) == 0) gate.Release();
+            return ValueTask.CompletedTask;
+        }
     }
 }
 
