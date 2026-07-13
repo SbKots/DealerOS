@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DealerOS.Api.Infrastructure;
+using DealerOS.Modules.Crm.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace DealerOS.IntegrationTests;
@@ -276,6 +277,155 @@ public sealed class ReleaseTrainApiTests(ReconditioningPostgresFixture database)
         Assert.True(await factory.QueryDbAsync(db => db.AuditEvents.CountAsync(x =>
             x.OrganizationId == DemoSeed.VolgaOrganizationId && (x.Operation.StartsWith("quality.")
                 || x.Operation.StartsWith("listing.")))) >= 8);
+    }
+
+    [Fact]
+    public async Task CustomerLeadWorkflow_WarnsDuplicatesMergesExplicitlyAndMeasuresFirstResponseSla()
+    {
+        await using var databaseLease = await _database.BeginTestAsync();
+        await using var factory = new DealerOsApiFactory(_database.ConnectionString);
+        using var manager = factory.CreateClient();
+        await AuthenticateAsync(manager, "manager@volga-auto.demo");
+
+        await factory.ExecuteDbAsync(async db =>
+        {
+            db.Customers.Add(Customer.Create(DemoSeed.VolgaOrganizationId, DemoSeed.VolgaSecondaryBranchId,
+                CustomerType.LegalEntity, "Скрытый клиент Казани", "+7 843 555-12-12", null,
+                PreferredContactChannel.Phone, false, false, null, null, DemoSeed.VolgaAdminUserId,
+                DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        });
+        var inaccessibleBranchSearch = await manager.GetFromJsonAsync<JsonElement>(
+            "/api/crm/customers?query=Скрытый клиент Казани");
+        Assert.Empty(inaccessibleBranchSearch.EnumerateArray());
+
+        var targetCreate = await PostAndReadAsync(manager, "/api/crm/customers", new
+        {
+            branchId = DemoSeed.VolgaBranchId,
+            type = "Individual",
+            name = "Иван Петров",
+            phone = "+7 999 123-45-67",
+            email = "ivan@example.com",
+            preferredChannel = "Phone",
+            consentGiven = true,
+            marketingConsent = false,
+            consentAt = DateTimeOffset.UtcNow,
+            consentSource = "Website form"
+        });
+        var target = targetCreate.GetProperty("customer");
+        var sourceCreate = await PostAndReadAsync(manager, "/api/crm/customers", new
+        {
+            branchId = DemoSeed.VolgaBranchId,
+            type = "Individual",
+            name = "И. Петров",
+            phone = "8 (999) 123-45-67",
+            email = "IVAN@EXAMPLE.COM",
+            preferredChannel = "Email",
+            consentGiven = false,
+            marketingConsent = false
+        });
+        var source = sourceCreate.GetProperty("customer");
+        Assert.Contains(sourceCreate.GetProperty("possibleDuplicates").EnumerateArray(), x =>
+            x.GetProperty("id").GetGuid() == target.GetProperty("id").GetGuid());
+        Assert.Equal("+79991234567", source.GetProperty("normalizedPhone").GetString());
+
+        var lead = await PostAndReadAsync(manager, "/api/crm/leads", new
+        {
+            branchId = DemoSeed.VolgaBranchId,
+            customerId = source.GetProperty("id").GetGuid(),
+            searchCriteria = "Кроссовер до 3 млн рублей",
+            source = "Website"
+        });
+        var leadId = lead.GetProperty("id").GetGuid();
+        var preview = await GetAndReadAsync(manager,
+            $"/api/crm/customers/{source.GetProperty("id").GetGuid()}/merge-preview/{target.GetProperty("id").GetGuid()}");
+        Assert.Equal(1, preview.GetProperty("leadsToMove").GetInt32());
+        var mergeCommandId = Guid.NewGuid();
+        var merged = await PostAndReadAsync(manager,
+            $"/api/crm/customers/{source.GetProperty("id").GetGuid()}/merge", new
+            {
+                commandId = mergeCommandId,
+                targetCustomerId = target.GetProperty("id").GetGuid(),
+                reason = "Подтверждено по ivan@example.com",
+                expectedSourceVersion = source.GetProperty("version").GetInt64()
+            });
+        Assert.True(merged.GetProperty("isMerged").GetBoolean());
+
+        lead = await GetAndReadAsync(manager, $"/api/crm/leads/{leadId}");
+        Assert.Equal(target.GetProperty("id").GetGuid(), lead.GetProperty("customerId").GetGuid());
+        await factory.ExecuteDbAsync(async db =>
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE crm.leads SET \"FirstResponseDueAt\" = {DateTimeOffset.UtcNow.AddMinutes(-1)} WHERE \"Id\" = {leadId}");
+        });
+        lead = await GetAndReadAsync(manager, $"/api/crm/leads/{leadId}");
+        Assert.True(lead.GetProperty("slaBreached").GetBoolean());
+
+        var assignCommandId = Guid.NewGuid();
+        lead = await PostAndReadAsync(manager, $"/api/crm/leads/{leadId}/assign-round-robin", new
+        {
+            commandId = assignCommandId,
+            expectedVersion = lead.GetProperty("version").GetInt64()
+        });
+        var assignedManager = lead.GetProperty("assignedManagerUserId").GetGuid();
+        using var repeatedAssignment = await manager.PostAsJsonAsync($"/api/crm/leads/{leadId}/assign-round-robin",
+            new { commandId = assignCommandId, expectedVersion = 1 });
+        var repeatedLead = await ReadJsonAsync(repeatedAssignment);
+        Assert.Equal(assignedManager, repeatedLead.GetProperty("assignedManagerUserId").GetGuid());
+
+        var contactCommandId = Guid.NewGuid();
+        lead = await PostAndReadAsync(manager, $"/api/crm/leads/{leadId}/activities", new
+        {
+            commandId = contactCommandId,
+            type = "Call",
+            direction = "Outbound",
+            result = "Answered",
+            summary = "Клиент подтвердил интерес",
+            meaningfulContact = true,
+            nextAction = "Назначить визит",
+            nextActionDueAt = DateTimeOffset.UtcNow.AddDays(1),
+            expectedVersion = lead.GetProperty("version").GetInt64()
+        });
+        var firstResponseAt = lead.GetProperty("firstResponseAt").GetDateTimeOffset();
+        Assert.Equal("FirstContact", lead.GetProperty("status").GetString());
+        Assert.False(lead.GetProperty("slaBreached").GetBoolean());
+        using var repeatedContact = await manager.PostAsJsonAsync($"/api/crm/leads/{leadId}/activities", new
+        {
+            commandId = contactCommandId,
+            type = "Call",
+            direction = "Outbound",
+            result = "Answered",
+            summary = "Клиент подтвердил интерес",
+            meaningfulContact = true,
+            nextAction = "Назначить визит",
+            nextActionDueAt = lead.GetProperty("nextActionDueAt").GetDateTimeOffset(),
+            expectedVersion = 1
+        });
+        var repeatedFirstResponseAt = (await ReadJsonAsync(repeatedContact)).GetProperty("firstResponseAt")
+            .GetDateTimeOffset();
+        Assert.InRange((repeatedFirstResponseAt - firstResponseAt).Duration(), TimeSpan.Zero,
+            TimeSpan.FromMicroseconds(1));
+        lead = await PostAndReadAsync(manager, $"/api/crm/leads/{leadId}/qualify", new
+        {
+            commandId = Guid.NewGuid(),
+            nextAction = "Согласовать время визита",
+            nextActionDueAt = DateTimeOffset.UtcNow.AddDays(1),
+            expectedVersion = lead.GetProperty("version").GetInt64()
+        });
+        Assert.Equal("Qualified", lead.GetProperty("status").GetString());
+
+        using var viewer = factory.CreateClient();
+        await AuthenticateAsync(viewer, "viewer@volga-auto.demo");
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync("/api/crm/leads")).StatusCode);
+        using var north = factory.CreateClient();
+        await AuthenticateAsync(north, "admin@north-auto.demo");
+        var northSearch = await north.GetFromJsonAsync<JsonElement>("/api/crm/customers?query=ivan@example.com");
+        Assert.Empty(northSearch.EnumerateArray());
+        var auditPayloads = await factory.QueryDbAsync(db => db.AuditEvents.Where(x =>
+            x.OrganizationId == DemoSeed.VolgaOrganizationId && x.Operation.StartsWith("crm."))
+            .Select(x => x.NewValue).ToListAsync());
+        Assert.DoesNotContain(auditPayloads, payload => payload.Contains("ivan@example.com", StringComparison.OrdinalIgnoreCase)
+            || payload.Contains("+79991234567", StringComparison.Ordinal));
     }
 
     private static async Task<(Guid PlanId, Guid SnapshotId, decimal Total)> CreateApprovedPlanAsync(

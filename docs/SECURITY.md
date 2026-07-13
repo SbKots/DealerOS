@@ -14,6 +14,7 @@
 - Пароли demo seed хешируются стандартным `PasswordHasher`; реальные среды должны использовать IdP, MFA для privileged users и secret manager.
 - JWT key в `appsettings.json` и Compose только локальный. Production обязан переопределить его секретом, отключить demo seed и использовать TLS.
 - Audit table не имеет API изменения/удаления. Логи не содержат пароль/токен/полный request body.
+- CRM contact values, consent source, merge/close reason и activity summary не копируются в audit payload или application logs. Tenant-aware customer/lead FK, branch predicates и отдельный merge permission защищают PII от межорганизационного и непривилегированного доступа.
 - Dependency restore проверяется NuGet/npm audit в release hardening; известная уязвимая OpenAPI dependency шаблона удалена.
 - До production нужны полноценная rotation/revocation модель с security stamp или централизованным IdP, MFA, CSP, secure headers, malware scanning/CDR для файлов, S3 encryption/lifecycle, backup/restore drill и правовая проверка персональных данных.
 

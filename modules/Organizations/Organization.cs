@@ -3,12 +3,16 @@ namespace DealerOS.Modules.Organizations;
 public sealed class Organization
 {
     private Organization() { }
-    public Organization(Guid id, string name, bool requireIndependentReconditioningApproval = true) =>
-        (Id, Name, RequireIndependentReconditioningApproval) =
-        (id, name.Trim(), requireIndependentReconditioningApproval);
+    public Organization(Guid id, string name, bool requireIndependentReconditioningApproval = true,
+        int leadFirstResponseSlaMinutes = 30) =>
+        (Id, Name, RequireIndependentReconditioningApproval, LeadFirstResponseSlaMinutes) =
+        (id, name.Trim(), requireIndependentReconditioningApproval,
+            leadFirstResponseSlaMinutes is >= 1 and <= 10_080 ? leadFirstResponseSlaMinutes
+                : throw new ArgumentOutOfRangeException(nameof(leadFirstResponseSlaMinutes)));
     public Guid Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public bool RequireIndependentReconditioningApproval { get; private set; }
+    public int LeadFirstResponseSlaMinutes { get; private set; }
 }
 
 public sealed class Branch

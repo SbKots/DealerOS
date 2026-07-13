@@ -1,3 +1,4 @@
+using DealerOS.Modules.Crm.Domain;
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Domain;
 using DealerOS.Modules.Organizations;
@@ -54,7 +55,7 @@ public static class DemoSeed
             AddUser(db, hasher, VolgaManagerUserId, VolgaOrganizationId, VolgaBranchId,
                 "manager@volga-auto.demo", "Марина Руководитель",
                 [Permissions.VehiclesRead, .. Permissions.ReconditioningManager, .. Permissions.OperationsManager,
-                    .. Permissions.QualityManager, Permissions.ListingsView]);
+                    .. Permissions.QualityManager, Permissions.ListingsView, .. Permissions.CrmManager]);
         await db.SaveChangesAsync(cancellationToken);
 
         await EnsurePermissionsAsync(db, VolgaAdminUserId, Permissions.VehicleOperator, cancellationToken);
@@ -66,7 +67,7 @@ public static class DemoSeed
             cancellationToken);
         await EnsurePermissionsAsync(db, VolgaManagerUserId,
             [Permissions.VehiclesRead, .. Permissions.ReconditioningManager, .. Permissions.OperationsManager,
-                .. Permissions.QualityManager, Permissions.ListingsView],
+                .. Permissions.QualityManager, Permissions.ListingsView, .. Permissions.CrmManager],
             cancellationToken);
 
         if (!await db.InspectionTemplates.AnyAsync(x => x.Id == VolgaTemplateId, cancellationToken))
@@ -114,6 +115,30 @@ public static class DemoSeed
             db.Inspections.Add(inspection);
         }
         await db.SaveChangesAsync(cancellationToken);
+
+        const string demoCustomerEmail = "ivan.petrov@dealeros.demo";
+        var demoCustomer = await db.Customers.SingleOrDefaultAsync(x => x.OrganizationId == VolgaOrganizationId
+            && x.NormalizedEmail == demoCustomerEmail, cancellationToken);
+        if (demoCustomer is null)
+        {
+            var now = DateTimeOffset.UtcNow;
+            demoCustomer = Customer.Create(VolgaOrganizationId, VolgaBranchId, CustomerType.Individual,
+                "Иван Петров", "+7 999 123-45-67", demoCustomerEmail, PreferredContactChannel.Phone, true,
+                false, now, "Личная заявка в салоне", VolgaAdminUserId, now);
+            db.Customers.Add(demoCustomer);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        if (!await db.Leads.AnyAsync(x => x.OrganizationId == VolgaOrganizationId
+            && x.CustomerId == demoCustomer.Id, cancellationToken))
+        {
+            var createdAt = DateTimeOffset.UtcNow.AddMinutes(-45);
+            var lead = Lead.Create(VolgaOrganizationId, VolgaBranchId, demoCustomer.Id, null,
+                "Кроссовер до 2 млн ₽", "Входящий звонок", VolgaAdminUserId, 30, createdAt);
+            lead.Assign(Guid.NewGuid(), VolgaManagerUserId, VolgaAdminUserId, lead.Version,
+                createdAt.AddMinutes(1));
+            db.Leads.Add(lead);
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static void AddUser(DealerOsDbContext db, IPasswordHasher<UserAccount> hasher, Guid id, Guid organizationId,

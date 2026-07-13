@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using DealerOS.Api.Auth;
 using DealerOS.Api.Endpoints;
 using DealerOS.Api.Infrastructure;
+using DealerOS.Modules.Crm.Application;
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Application;
 using DealerOS.Modules.Operations.Application;
@@ -76,6 +77,9 @@ builder.Services.AddScoped<QualityListingStore>();
 builder.Services.AddScoped<IQualityListingStore>(sp => sp.GetRequiredService<QualityListingStore>());
 builder.Services.AddScoped<QualityControlService>();
 builder.Services.AddScoped<MediaListingService>();
+builder.Services.AddScoped<CrmStore>();
+builder.Services.AddScoped<ICrmStore>(sp => sp.GetRequiredService<CrmStore>());
+builder.Services.AddScoped<CrmService>();
 builder.Services.AddHostedService<OperationsDeadlineWorker>();
 builder.Services.AddSingleton<IMinioClient>(_ =>
 {
@@ -187,6 +191,7 @@ app.MapInspectionEndpoints();
 app.MapReconditioningEndpoints();
 app.MapOperationsEndpoints();
 app.MapQualityListingEndpoints();
+app.MapCrmEndpoints();
 app.Run();
 
 public partial class Program;

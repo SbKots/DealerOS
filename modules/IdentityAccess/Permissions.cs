@@ -29,6 +29,29 @@ public static class Permissions
     public const string ListingsView = "listings.view";
     public const string ListingsEdit = "listings.edit";
     public const string ListingsPublish = "listings.publish";
+    public const string CrmCustomersView = "crm.customers.view";
+    public const string CrmCustomersEdit = "crm.customers.edit";
+    public const string CrmCustomersMerge = "crm.customers.merge";
+    public const string CrmLeadsView = "crm.leads.view";
+    public const string CrmLeadsCreate = "crm.leads.create";
+    public const string CrmLeadsAssign = "crm.leads.assign";
+    public const string CrmLeadsWork = "crm.leads.work";
+
+    public static readonly string[] CrmOperator =
+    [
+        CrmCustomersView,
+        CrmCustomersEdit,
+        CrmLeadsView,
+        CrmLeadsCreate,
+        CrmLeadsWork
+    ];
+
+    public static readonly string[] CrmManager =
+    [
+        .. CrmOperator,
+        CrmCustomersMerge,
+        CrmLeadsAssign
+    ];
 
     public static readonly string[] QualityManager =
     [
@@ -96,6 +119,7 @@ public static class Permissions
         .. OperationsOperator,
         .. OperationsManager,
         .. QualityManager,
-        .. ListingOperator
+        .. ListingOperator,
+        .. CrmManager
     ];
 }

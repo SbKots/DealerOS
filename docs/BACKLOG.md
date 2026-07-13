@@ -41,12 +41,21 @@
 - immutable Listing Ready snapshot и manual JSON export;
 - ручной journal Draft/Exported/Published/Failed/Unpublished без ложной интеграции.
 
-## Следующая итерация 0.6 — Customer и Lead
+## Готово в коде — итерация 0.6
 
-1. Tenant-aware Customer и дедупликация контактов.
-2. Lead source/vehicle/channel/owner/status и activity timeline.
-3. First-response SLA, очередь и просрочки.
-4. Безопасное merge дублей с аудитом.
+- tenant-aware Customer, нормализация контактов, consent evidence и поиск дублей;
+- privileged preview/merge с обязательной причиной и безопасным аудитом;
+- Lead source/vehicle-or-criteria/manager/status и неизменяемый activity timeline;
+- ручное и детерминированное round-robin назначение;
+- настраиваемый first-response SLA, очередь просрочек и первое осмысленное действие;
+- idempotency, optimistic concurrency, permissions и cross-tenant negative tests.
+
+## Следующая итерация 0.7 — продажа и выдача
+
+1. Тест-драйв и история результата.
+2. Offer, скидка и независимое согласование.
+3. Временная бронь с конкурентной защитой и истечением.
+4. Deal snapshot, оплата, выдача и итоговая экономика plan/fact.
 
 ## Позже по MVP
 

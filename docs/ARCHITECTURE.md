@@ -20,6 +20,7 @@ React/Vite -> ASP.NET Core command endpoints -> application services -> aggregat
 - `Inspections`: версионные шаблоны, агрегат Inspection, пункты, дефекты, метаданные фото и команды lifecycle.
 - `Reconditioning`: агрегат плана, работы, исключения обязательных дефектов, решения, бюджетные snapshots и ревизии.
 - `Operations`: исполнение утверждённого snapshot, заказ-работы, материалы, фактические расходы, перерасход, сроки и состояние расчёта с подрядчиком.
+- `CRM`: клиент, согласия и дедупликация; лид, назначение, SLA первого ответа, activity timeline и явные lifecycle-команды.
 - `SharedKernel`: только стабильные малые понятия и типы ошибок.
 - `apps/api/Infrastructure`: EF mappings по схемам `identity`, `organizations`, `vehicles`, `audit`; это адаптер, а не место бизнес-правил.
 
@@ -53,6 +54,9 @@ Execution Completed -- QC Pass --> Vehicle ReadyForSale
 Execution Completed -- QC ReworkRequired --> selected work ReturnedForRework --> new QC revision
 Listing Draft -- ready(required media + cover + content) --> Listing Ready
 Channel Draft -- manual export --> Exported -- explicit confirmation --> Published -- unpublish --> Unpublished
+
+Lead New -- assign --> Assigned -- meaningful contact --> FirstContact -- qualify --> Qualified
+Lead New/Assigned/FirstContact/Qualified -- close(reason) --> Lost/Spam/Duplicate/Deferred
 ```
 
 `InspectionPassed` означает только техническое прохождение осмотра без дефектов, требующих подготовки или блокирующих продажу. Это не полная готовность к продаже: будущий `ReadyForSale` может быть установлен только после подготовки и контроля качества в следующем процессе. Повторный переход запрещён доменом. Универсального PATCH статуса нет. Каждое создание/принятие создаёт status history и audit event в одном `SaveChanges`.
@@ -86,6 +90,14 @@ Approved не редактируется. Новая ревизия копиру
 `VehicleMedia` хранит tenant/branch/vehicle metadata приватного объекта. Pipeline повторно использует decode/re-encode и лимиты Inspections; каждая upload attempt имеет уникальный object key, а конфликт удаляет только собственный объект. Категории: `Exterior`, `Interior`, `DamageHistory`, `DocumentsInternal`; внутренние документы не могут быть cover и не входят в публичный snapshot.
 
 `ListingContent` хранит snapshot характеристик, контента, цены, template/version и упорядоченных media. `Ready` неизменяем, требует Exterior/Interior/DamageHistory и ровно одну cover. Manual export создаёт только `Exported`; `Published` появляется исключительно отдельной командой после фактического подтверждения сотрудником. Command ID, optimistic concurrency, history и audit защищают историю цены, контента и публикаций.
+
+## CRM и SLA первого ответа
+
+`Customer` принадлежит organization и филиалу создания, хранит только нормализованные phone/email, канал и доказательства согласия. Поиск и duplicate warning всегда ограничены tenant и доступными филиалами. Merge не удаляет источник: он требует отдельного permission, предварительного просмотра и причины, сохраняет связь с целевой записью, переводит лиды и пишет аудит без контактных данных.
+
+`Lead` фиксирует source, branch, customer, автомобиль либо критерии поиска и неизменяемый `FirstResponseDueAt`, вычисленный из tenant-настройки. Ручное и round-robin назначение — отдельные идемпотентные команды; round-robin исключает неактивных/недоступных пользователей и детерминированно выбирает минимальную активную нагрузку. `FirstResponseAt` устанавливается один раз только осмысленной activity. Повтор command ID с тем же payload безопасен, с другим — конфликт; optimistic concurrency и unique history constraint не допускают двойного результата.
+
+Закрытые activity и финальные lead statuses неизменяемы. Сводка activity ограничена и не попадает в audit payload; application logs не содержат телефон/email. UI показывает SLA по `TimeProvider`-совместимой серверной проекции, но браузер не решает бизнес-правила.
 
 ## Данные
 

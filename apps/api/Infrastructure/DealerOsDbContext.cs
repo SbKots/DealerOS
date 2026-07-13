@@ -1,3 +1,4 @@
+using DealerOS.Modules.Crm.Domain;
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Domain;
 using DealerOS.Modules.Operations.Domain;
@@ -41,6 +42,10 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
     public DbSet<ListingContent> ListingContents => Set<ListingContent>();
     public DbSet<ChannelPublication> ChannelPublications => Set<ChannelPublication>();
     public DbSet<ListingContentHistory> ListingContentHistory => Set<ListingContentHistory>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Lead> Leads => Set<Lead>();
+    public DbSet<LeadActivity> LeadActivities => Set<LeadActivity>();
+    public DbSet<LeadStatusHistory> LeadStatusHistory => Set<LeadStatusHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,6 +57,7 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.LeadFirstResponseSlaMinutes).HasDefaultValue(30);
             entity.Property(x => x.RequireIndependentReconditioningApproval).HasDefaultValue(true);
         });
 
@@ -831,6 +837,103 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
                 .HasDatabaseName("ux_listing_history_command");
             entity.HasOne<ListingContent>().WithMany(x => x.History)
                 .HasForeignKey(x => new { x.OrganizationId, x.ListingContentId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Customer>(entity =>
+        {
+            entity.ToTable("customers", "crm", table =>
+            {
+                table.HasCheckConstraint("ck_crm_customer_type", "\"Type\" IN (1, 2)");
+                table.HasCheckConstraint("ck_crm_customer_channel", "\"PreferredChannel\" BETWEEN 1 AND 3");
+                table.HasCheckConstraint("ck_crm_customer_version", "\"Version\" > 0");
+                table.HasCheckConstraint("ck_crm_customer_consent", "(NOT \"ConsentGiven\" AND NOT \"MarketingConsent\") OR (\"ConsentAt\" IS NOT NULL AND \"ConsentSource\" IS NOT NULL)");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_crm_customers_organization_id");
+            entity.Property(x => x.Name).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.NormalizedPhone).HasMaxLength(16);
+            entity.Property(x => x.NormalizedEmail).HasMaxLength(320);
+            entity.Property(x => x.ConsentSource).HasMaxLength(200);
+            entity.Property(x => x.MergeReason).HasMaxLength(2000);
+            entity.Property(x => x.Version).IsConcurrencyToken(); entity.Ignore(x => x.IsMerged);
+            entity.HasIndex(x => new { x.OrganizationId, x.NormalizedPhone });
+            entity.HasIndex(x => new { x.OrganizationId, x.NormalizedEmail });
+            entity.HasIndex(x => new { x.OrganizationId, x.Name });
+            entity.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CreatedInBranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.MergedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.HasOne<Customer>().WithMany().HasForeignKey(x => new { x.OrganizationId, Id = x.MergedIntoCustomerId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+        });
+
+        modelBuilder.Entity<Lead>(entity =>
+        {
+            entity.ToTable("leads", "crm", table =>
+            {
+                table.HasCheckConstraint("ck_crm_lead_status", "\"Status\" BETWEEN 1 AND 8");
+                table.HasCheckConstraint("ck_crm_lead_interest", "\"VehicleId\" IS NOT NULL OR \"SearchCriteria\" IS NOT NULL");
+                table.HasCheckConstraint("ck_crm_lead_version", "\"Version\" > 0");
+                table.HasCheckConstraint("ck_crm_lead_first_response", "\"FirstResponseAt\" IS NULL OR \"AssignedManagerUserId\" IS NOT NULL");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_crm_leads_organization_id");
+            entity.Property(x => x.SearchCriteria).HasMaxLength(2000); entity.Property(x => x.Source).HasMaxLength(100);
+            entity.Property(x => x.LostReason).HasMaxLength(2000); entity.Property(x => x.NextAction).HasMaxLength(1000);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.OrganizationId, x.BranchId, x.Status, x.CreatedAt });
+            entity.HasIndex(x => new { x.OrganizationId, x.AssignedManagerUserId, x.Status });
+            entity.HasIndex(x => new { x.OrganizationId, x.FirstResponseDueAt });
+            entity.HasOne<Customer>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CustomerId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Vehicle>().WithMany().HasForeignKey(x => new { x.OrganizationId, Id = x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, Id = x.AssignedManagerUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
+            entity.Navigation(x => x.Activities).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.History).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<LeadActivity>(entity =>
+        {
+            entity.ToTable("lead_activities", "crm", table =>
+            {
+                table.HasCheckConstraint("ck_crm_activity_type", "\"Type\" BETWEEN 1 AND 5");
+                table.HasCheckConstraint("ck_crm_activity_direction", "\"Direction\" BETWEEN 1 AND 3");
+            });
+            entity.HasKey(x => new { x.OrganizationId, x.LeadId, x.Id }); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Result).HasMaxLength(100); entity.Property(x => x.Summary).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.OrganizationId, x.LeadId, x.CommandId }).IsUnique()
+                .HasDatabaseName("ux_crm_activity_command");
+            entity.HasOne<Lead>().WithMany(x => x.Activities).HasForeignKey(x => new { x.OrganizationId, x.LeadId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<LeadStatusHistory>(entity =>
+        {
+            entity.ToTable("lead_history", "crm", table =>
+            {
+                table.HasCheckConstraint("ck_crm_history_from", "\"FromStatus\" IS NULL OR \"FromStatus\" BETWEEN 1 AND 8");
+                table.HasCheckConstraint("ck_crm_history_to", "\"ToStatus\" BETWEEN 1 AND 8");
+            });
+            entity.HasKey(x => new { x.OrganizationId, x.LeadId, x.Id }); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Operation).HasMaxLength(50); entity.Property(x => x.Signature).HasColumnType("text");
+            entity.HasIndex(x => new { x.OrganizationId, x.LeadId, x.CommandId }).IsUnique()
+                .HasDatabaseName("ux_crm_lead_history_command");
+            entity.HasOne<Lead>().WithMany(x => x.History).HasForeignKey(x => new { x.OrganizationId, x.LeadId })
                 .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
                 .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
