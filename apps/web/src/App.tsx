@@ -6,6 +6,10 @@ import { z } from 'zod'
 import { api, ApiError, clearSession, getSession, hasSession, saveSession, sessionExpiredEvent, type Session } from './api'
 import { InspectionsWorkspace } from './Inspections'
 import { ReconditioningWorkspace } from './Reconditioning'
+import { OperationsWorkspace } from './Operations'
+import { QualityListingsWorkspace } from './QualityListings'
+import { CrmWorkspace } from './Crm'
+import { SalesWorkspace } from './Sales'
 import './App.css'
 
 const intakeSchema = z.object({
@@ -24,7 +28,7 @@ type IntakeForm = z.output<typeof intakeSchema>
 export type Branch = { id: string; code: string; name: string }
 export type Vehicle = {
   id: string; branchId: string; branchName: string; vin: string; make: string; model: string; year: number
-  mileageKm: number; plannedPurchaseAmount: number; currency: string; status: 'IntakeDraft' | 'InStock' | 'InspectionInProgress' | 'ReconditioningRequired' | 'InspectionPassed'
+  mileageKm: number; plannedPurchaseAmount: number; currency: string; status: 'IntakeDraft' | 'InStock' | 'InspectionInProgress' | 'ReconditioningRequired' | 'InspectionPassed' | 'ReadyForSale'
   stockNumber?: string; createdAt: string; acceptedAt?: string; version: number
 }
 
@@ -36,7 +40,7 @@ export default function App() {
   const queryClient = useQueryClient()
   const [authenticated, setAuthenticated] = useState(hasSession())
   const [selected, setSelected] = useState<Vehicle | null>(null)
-  const [view, setView] = useState<'intake' | 'inspections' | 'reconditioning'>('intake')
+  const [view, setView] = useState<'intake' | 'inspections' | 'reconditioning' | 'operations' | 'quality-listings' | 'crm' | 'sales'>('intake')
   const [inspectionVehicle, setInspectionVehicle] = useState<Vehicle | null>(null)
   const [email, setEmail] = useState('admin@volga-auto.demo')
   const [password, setPassword] = useState('DealerOS!2026')
@@ -109,13 +113,17 @@ export default function App() {
         <button className={view === 'intake' ? 'active' : ''} onClick={() => setView('intake')}>Приёмка</button>
         {session?.permissions?.includes('vehicles.inspections.view') && <button className={view === 'inspections' ? 'active' : ''} onClick={() => { setInspectionVehicle(null); setView('inspections') }}>Осмотры</button>}
         {session?.permissions?.includes('reconditioning.view') && <button className={view === 'reconditioning' ? 'active' : ''} onClick={() => setView('reconditioning')}>Подготовка</button>}
+        {session?.permissions?.includes('operations.view') && <button className={view === 'operations' ? 'active' : ''} onClick={() => setView('operations')}>Выполнение</button>}
+        {(session?.permissions?.includes('quality.view') || session?.permissions?.includes('listings.view')) && <button className={view === 'quality-listings' ? 'active' : ''} onClick={() => setView('quality-listings')}>Качество и контент</button>}
+        {(session?.permissions?.includes('crm.customers.view') || session?.permissions?.includes('crm.leads.view')) && <button className={view === 'crm' ? 'active' : ''} onClick={() => setView('crm')}>Клиенты и лиды</button>}
+        {(session?.permissions?.includes('sales.visits.view') || session?.permissions?.includes('sales.offers.view')) && <button className={view === 'sales' ? 'active' : ''} onClick={() => setView('sales')}>Визиты и Offer</button>}
       </nav>
       <div className="context-pill"><span className="pulse" />{session?.organizationName} · {session?.branchName}</div>
       <button className="link-button" onClick={() => { clearSession(); setView('intake'); setAuthenticated(false); queryClient.clear() }}>Выйти</button>
     </header>
 
     <main className="workspace">
-      {view === 'inspections' ? <InspectionsWorkspace focusVehicle={inspectionVehicle} onClearFocus={() => setInspectionVehicle(null)} /> : view === 'reconditioning' ? <ReconditioningWorkspace /> : <>
+      {view === 'inspections' ? <InspectionsWorkspace focusVehicle={inspectionVehicle} onClearFocus={() => setInspectionVehicle(null)} /> : view === 'reconditioning' ? <ReconditioningWorkspace /> : view === 'operations' ? <OperationsWorkspace /> : view === 'quality-listings' ? <QualityListingsWorkspace /> : view === 'crm' ? <CrmWorkspace /> : view === 'sales' ? <SalesWorkspace /> : <>
       <div className="page-heading">
         <div><p className="eyebrow">Склад автомобилей</p><h1>Приём автомобиля</h1><p className="muted">Создайте цифровой паспорт, затем подтвердите фактическую приёмку на площадку.</p></div>
         <div className="metric"><span>На контроле</span><strong>{vehicles.data?.filter((x) => x.status === 'IntakeDraft').length ?? 0}</strong><small>черновиков поступления</small></div>
@@ -172,7 +180,7 @@ function VehicleCard({ vehicle, accepting, onAccept, onOpenInspections, error }:
 }
 
 function Status({ status }: { status: Vehicle['status'] }) {
-  const labels: Record<Vehicle['status'], string> = { IntakeDraft: 'Черновик', InStock: 'На складе', InspectionInProgress: 'На осмотре', ReconditioningRequired: 'Нужна подготовка', InspectionPassed: 'Осмотр пройден' }
+  const labels: Record<Vehicle['status'], string> = { IntakeDraft: 'Черновик', InStock: 'На складе', InspectionInProgress: 'На осмотре', ReconditioningRequired: 'Нужна подготовка', InspectionPassed: 'Осмотр пройден', ReadyForSale: 'Готов к продаже' }
   return <span className={`status ${status === 'IntakeDraft' ? 'draft' : 'success'}`}><i />{labels[status]}</span>
 }
 

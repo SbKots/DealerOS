@@ -1,5 +1,17 @@
 # Backlog
 
+## Готово в коде — итерация 0.7
+
+- календарь визитов, reschedule/arrival/result и безопасный test-drive check-out/check-in;
+- PostgreSQL-защита от пересечения активных слотов автомобиля и ответственного менеджера;
+- серверный preview Offer из публичной цены, прозрачных строк, скидки и подтверждённой себестоимости;
+- контроль валюты, лимита скидки, минимальной маржи и запрет self-approval;
+- auto approval в пределах полномочий и отдельные idempotent manager decisions;
+- неизменяемый Approved Offer snapshot, история и новая ревизия;
+- permissions, audit, optimistic concurrency, tenant/branch isolation, unit/integration/component tests.
+
+Следующий scope: Reservation/Deal, оплата, договоры, выдача и итоговая экономика продажи. Эти функции намеренно не включены в 0.7.
+
 ## Готово — итерация 0.1
 
 - discovery, scope, KPI, допущения и риски;
@@ -25,13 +37,36 @@
 - новая ревизия утверждённого плана, сравнение и read-only история;
 - tenant-aware constraints, optimistic concurrency, audit, PostgreSQL/component/Playwright tests.
 
-## Следующая итерация 0.4 — выполнение подготовки
+## Готово в коде — итерация 0.4
 
-1. Фактическое выполнение работ и заказ-наряды.
-2. Склад/резерв/списание запчастей и фактические расходы.
-3. Контроль качества и переход к полной `ReadyForSale`.
-4. Расчёты с подрядчиками и план/факт отклонения бюджета.
-5. Уведомления по срокам и просрочкам.
+- execution из неизменяемого утверждённого snapshot и заказ-работы;
+- фактические labor/material/external расходы и возвраты материалов;
+- блокировка, сроки, уведомления, подрядчики и settlement status;
+- план/лимит/факт/variance и отдельное идемпотентное решение о перерасходе;
+- tenant-aware constraints, optimistic concurrency, аудит и PostgreSQL/component tests.
+
+## Готово в коде — итерация 0.5
+
+- QC gate, замечания конкретным работам и неизменяемые повторные попытки;
+- полная `ReadyForSale` только после успешного независимого QC;
+- безопасные media, обязательные категории, cover/order и Content Pack;
+- immutable Listing Ready snapshot и manual JSON export;
+- ручной journal Draft/Exported/Published/Failed/Unpublished без ложной интеграции.
+
+## Готово в коде — итерация 0.6
+
+- tenant-aware Customer, нормализация контактов, consent evidence и поиск дублей;
+- privileged preview/merge с обязательной причиной и безопасным аудитом;
+- Lead source/vehicle-or-criteria/manager/status и неизменяемый activity timeline;
+- ручное и детерминированное round-robin назначение;
+- настраиваемый first-response SLA, очередь просрочек и первое осмысленное действие;
+- idempotency, optimistic concurrency, permissions и cross-tenant negative tests.
+
+## Следующая продуктовая граница
+
+1. Временная бронь с конкурентной защитой и истечением.
+2. Deal snapshot, оплата, договоры и выдача.
+3. Итоговая экономика plan/fact по завершённой продаже.
 
 ## Позже по MVP
 

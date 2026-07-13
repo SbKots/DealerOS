@@ -27,6 +27,9 @@
     <ProjectReference Include="..\..\modules\Vehicles\DealerOS.Modules.Vehicles.csproj" />
     <ProjectReference Include="..\..\modules\Inspections\DealerOS.Modules.Inspections.csproj" />
     <ProjectReference Include="..\..\modules\Reconditioning\DealerOS.Modules.Reconditioning.csproj" />
+    <ProjectReference Include="..\..\modules\Operations\DealerOS.Modules.Operations.csproj" />
+    <ProjectReference Include="..\..\modules\Crm\DealerOS.Modules.Crm.csproj" />
+    <ProjectReference Include="..\..\modules\Sales\DealerOS.Modules.Sales.csproj" />
   </ItemGroup>
 
 </Project>

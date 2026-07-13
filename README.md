@@ -1,6 +1,8 @@
 # DealerOS
 
-DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.3 связывает завершённый осмотр с планом предпродажной подготовки: обязательные дефекты, работы, плановый бюджет, очередь руководителя, неизменяемое решение и ревизии под tenant/branch isolation.
+> Текущий сквозной релиз 0.7 добавляет визиты и test drive, серверный расчёт предложения, контроль скидки и маржи, независимое согласование и неизменяемый snapshot утверждённого Offer. Подробности: [docs/ITERATION_0.7.md](docs/ITERATION_0.7.md).
+
+DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.7 связывает подготовленный автомобиль и квалифицированный лид с визитом, test drive и экономически контролируемым утверждённым предложением.
 
 ## Быстрый запуск
 
@@ -21,7 +23,9 @@ docker compose up --build
 
 Демо-диагност: `inspector@volga-auto.demo`, пароль тот же. MinIO Console: `http://localhost:9001`, локальные credentials заданы только в `compose.yaml`.
 
-Демо-подготовка: `prep@volga-auto.demo`. Демо-руководитель: `manager@volga-auto.demo`. Пароль тот же. Для них включено правило независимого согласования: автор не может утвердить собственный план.
+Демо-подготовка и контент: `prep@volga-auto.demo`. Демо-руководитель и QC: `manager@volga-auto.demo`. Пароль тот же. Для них включено независимое согласование; исполнитель execution не может провести QC своей работы.
+
+В CRM demo seed содержит клиента Ивана Петрова и назначенный просроченный лид «Кроссовер до 2 млн ₽». Руководитель может проверить очередь SLA, первый контакт и квалификацию; администратор — создание клиента и явное объединение найденных дублей.
 
 Остановить окружение: `docker compose down`. Удалить только локальные демонстрационные данные: `docker compose down -v`.
 
@@ -41,6 +45,7 @@ API в Development применяет миграции и идемпотентн
 - `Database__SeedDemo` — демонстрационные организации и пользователи.
 - `ObjectStorage__Endpoint`, `AccessKey`, `SecretKey`, `Bucket`, `UseSsl` — приватное S3-compatible хранилище фотографий;
 - `ObjectStorage__EnsureBucket` — создание bucket при старте только для Development/тестов.
+- `Operations__DeadlineWorkerEnabled`, `Operations__DeadlineWorkerIntervalMinutes` — фоновый tenant-aware контроль близких и просроченных сроков работ.
 
 Диагностика: `/health/live` проверяет процесс, `/health/ready` — PostgreSQL и object storage, `/health` сохранён как совмещённая проверка.
 
@@ -65,7 +70,7 @@ Integration tests используют настоящий PostgreSQL в Testcont
 
 - `apps/api` — composition root, HTTP API, EF Core, JWT, миграции и адаптеры;
 - `apps/web` — React/TypeScript интерфейс и Playwright e2e;
-- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles, Inspections и Reconditioning;
+- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles, Inspections, Reconditioning, Operations, CRM и Sales;
 - `tests` — backend unit и PostgreSQL integration tests;
 - `docs` — продукт, архитектура, решения, безопасность, demo и backlog;
 - `compose.yaml` — воспроизводимое локальное окружение;

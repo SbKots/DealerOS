@@ -1,3 +1,4 @@
+using DealerOS.Modules.Crm.Domain;
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Domain;
 using DealerOS.Modules.Organizations;
@@ -47,19 +48,27 @@ public static class DemoSeed
             AddUser(db, hasher, VolgaInspectorUserId, VolgaOrganizationId, VolgaBranchId, "inspector@volga-auto.demo", "Дмитрий Диагност", Permissions.InspectionOperator);
         if (!await db.Users.AnyAsync(x => x.Id == VolgaReconditioningUserId, cancellationToken))
             AddUser(db, hasher, VolgaReconditioningUserId, VolgaOrganizationId, VolgaBranchId,
-                "prep@volga-auto.demo", "Елена Подготовка", [Permissions.VehiclesRead, .. Permissions.ReconditioningOperator]);
+                "prep@volga-auto.demo", "Елена Подготовка",
+                [Permissions.VehiclesRead, .. Permissions.ReconditioningOperator, .. Permissions.OperationsOperator,
+                    .. Permissions.ListingOperator]);
         if (!await db.Users.AnyAsync(x => x.Id == VolgaManagerUserId, cancellationToken))
             AddUser(db, hasher, VolgaManagerUserId, VolgaOrganizationId, VolgaBranchId,
-                "manager@volga-auto.demo", "Марина Руководитель", [Permissions.VehiclesRead, .. Permissions.ReconditioningManager]);
+                "manager@volga-auto.demo", "Марина Руководитель",
+                [Permissions.VehiclesRead, .. Permissions.ReconditioningManager, .. Permissions.OperationsManager,
+                    .. Permissions.QualityManager, Permissions.ListingsView, .. Permissions.CrmManager]);
         await db.SaveChangesAsync(cancellationToken);
 
         await EnsurePermissionsAsync(db, VolgaAdminUserId, Permissions.VehicleOperator, cancellationToken);
         await EnsurePermissionsAsync(db, NorthAdminUserId, Permissions.VehicleOperator, cancellationToken);
         await EnsurePermissionsAsync(db, VolgaInspectorUserId, Permissions.InspectionOperator, cancellationToken);
         await EnsurePermissionsAsync(db, VolgaReconditioningUserId,
-            [Permissions.VehiclesRead, .. Permissions.ReconditioningOperator], cancellationToken);
+            [Permissions.VehiclesRead, .. Permissions.ReconditioningOperator, .. Permissions.OperationsOperator,
+                .. Permissions.ListingOperator],
+            cancellationToken);
         await EnsurePermissionsAsync(db, VolgaManagerUserId,
-            [Permissions.VehiclesRead, .. Permissions.ReconditioningManager], cancellationToken);
+            [Permissions.VehiclesRead, .. Permissions.ReconditioningManager, .. Permissions.OperationsManager,
+                .. Permissions.QualityManager, Permissions.ListingsView, .. Permissions.CrmManager],
+            cancellationToken);
 
         if (!await db.InspectionTemplates.AnyAsync(x => x.Id == VolgaTemplateId, cancellationToken))
             db.InspectionTemplates.Add(CreateTemplate(VolgaTemplateId, VolgaOrganizationId, VolgaAdminUserId));
@@ -106,6 +115,30 @@ public static class DemoSeed
             db.Inspections.Add(inspection);
         }
         await db.SaveChangesAsync(cancellationToken);
+
+        const string demoCustomerEmail = "ivan.petrov@dealeros.demo";
+        var demoCustomer = await db.Customers.SingleOrDefaultAsync(x => x.OrganizationId == VolgaOrganizationId
+            && x.NormalizedEmail == demoCustomerEmail, cancellationToken);
+        if (demoCustomer is null)
+        {
+            var now = DateTimeOffset.UtcNow;
+            demoCustomer = Customer.Create(VolgaOrganizationId, VolgaBranchId, CustomerType.Individual,
+                "Иван Петров", "+7 999 123-45-67", demoCustomerEmail, PreferredContactChannel.Phone, true,
+                false, now, "Личная заявка в салоне", VolgaAdminUserId, now);
+            db.Customers.Add(demoCustomer);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        if (!await db.Leads.AnyAsync(x => x.OrganizationId == VolgaOrganizationId
+            && x.CustomerId == demoCustomer.Id, cancellationToken))
+        {
+            var createdAt = DateTimeOffset.UtcNow.AddMinutes(-45);
+            var lead = Lead.Create(VolgaOrganizationId, VolgaBranchId, demoCustomer.Id, null,
+                "Кроссовер до 2 млн ₽", "Входящий звонок", VolgaAdminUserId, 30, createdAt);
+            lead.Assign(Guid.NewGuid(), VolgaManagerUserId, VolgaAdminUserId, lead.Version,
+                createdAt.AddMinutes(1));
+            db.Leads.Add(lead);
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static void AddUser(DealerOsDbContext db, IPasswordHasher<UserAccount> hasher, Guid id, Guid organizationId,
@@ -128,8 +161,7 @@ public static class DemoSeed
 
     private static InspectionTemplate CreateTemplate(Guid id, Guid organizationId, Guid actorUserId) => new(id,
         organizationId, "Базовый осмотр автомобиля", 1,
-        new[]
-        {
+        [
             Item("body", InspectionCategory.Body, "Кузов", 10),
             Item("interior", InspectionCategory.Interior, "Салон", 20),
             Item("engine", InspectionCategory.Engine, "Двигатель", 30),
@@ -141,7 +173,7 @@ public static class DemoSeed
             Item("wheels", InspectionCategory.WheelsAndTires, "Колёса и шины", 90),
             Item("documents", InspectionCategory.DocumentsAndEquipment, "Документы и комплектация", 100),
             Item("test-drive", InspectionCategory.TestDrive, "Тест-драйв", 110)
-        }, DateTimeOffset.UtcNow, actorUserId);
+        ], DateTimeOffset.UtcNow, actorUserId);
 
     private static InspectionTemplateItemDefinition Item(string key, InspectionCategory category, string label,
         int sortOrder) => new(key, category, label, null, true, sortOrder);

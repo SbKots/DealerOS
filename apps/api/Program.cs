@@ -4,9 +4,12 @@ using System.Threading.RateLimiting;
 using DealerOS.Api.Auth;
 using DealerOS.Api.Endpoints;
 using DealerOS.Api.Infrastructure;
+using DealerOS.Modules.Crm.Application;
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Application;
+using DealerOS.Modules.Operations.Application;
 using DealerOS.Modules.Reconditioning.Application;
+using DealerOS.Modules.Sales.Application;
 using DealerOS.Modules.Vehicles.Application;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -68,6 +71,20 @@ builder.Services.AddScoped<InspectionService>();
 builder.Services.AddScoped<ReconditioningStore>();
 builder.Services.AddScoped<IReconditioningStore>(sp => sp.GetRequiredService<ReconditioningStore>());
 builder.Services.AddScoped<ReconditioningService>();
+builder.Services.AddScoped<OperationsStore>();
+builder.Services.AddScoped<IOperationsStore>(sp => sp.GetRequiredService<OperationsStore>());
+builder.Services.AddScoped<OperationsService>();
+builder.Services.AddScoped<QualityListingStore>();
+builder.Services.AddScoped<IQualityListingStore>(sp => sp.GetRequiredService<QualityListingStore>());
+builder.Services.AddScoped<QualityControlService>();
+builder.Services.AddScoped<MediaListingService>();
+builder.Services.AddScoped<CrmStore>();
+builder.Services.AddScoped<ICrmStore>(sp => sp.GetRequiredService<CrmStore>());
+builder.Services.AddScoped<CrmService>();
+builder.Services.AddScoped<SalesStore>();
+builder.Services.AddScoped<ISalesStore>(sp => sp.GetRequiredService<SalesStore>());
+builder.Services.AddScoped<SalesService>();
+builder.Services.AddHostedService<OperationsDeadlineWorker>();
 builder.Services.AddSingleton<IMinioClient>(_ =>
 {
     var endpoint = builder.Configuration["ObjectStorage:Endpoint"]
@@ -176,6 +193,10 @@ app.MapOrganizationEndpoints();
 app.MapVehicleEndpoints();
 app.MapInspectionEndpoints();
 app.MapReconditioningEndpoints();
+app.MapOperationsEndpoints();
+app.MapQualityListingEndpoints();
+app.MapCrmEndpoints();
+app.MapSalesEndpoints();
 app.Run();
 
 public partial class Program;

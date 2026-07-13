@@ -17,6 +17,104 @@ public static class Permissions
     public const string ReconditioningSubmit = "reconditioning.submit";
     public const string ReconditioningApprove = "reconditioning.approve";
     public const string ReconditioningCancel = "reconditioning.cancel";
+    public const string OperationsView = "operations.view";
+    public const string OperationsCreate = "operations.create";
+    public const string OperationsEdit = "operations.edit";
+    public const string OperationsComplete = "operations.complete";
+    public const string OperationsApproveOverrun = "operations.approve_overrun";
+    public const string OperationsManageSettlement = "operations.manage_settlement";
+    public const string QualityView = "quality.view";
+    public const string QualityCreate = "quality.create";
+    public const string QualityDecide = "quality.decide";
+    public const string ListingsView = "listings.view";
+    public const string ListingsEdit = "listings.edit";
+    public const string ListingsPublish = "listings.publish";
+    public const string CrmCustomersView = "crm.customers.view";
+    public const string CrmCustomersEdit = "crm.customers.edit";
+    public const string CrmCustomersMerge = "crm.customers.merge";
+    public const string CrmLeadsView = "crm.leads.view";
+    public const string CrmLeadsCreate = "crm.leads.create";
+    public const string CrmLeadsAssign = "crm.leads.assign";
+    public const string CrmLeadsWork = "crm.leads.work";
+    public const string SalesVisitsView = "sales.visits.view";
+    public const string SalesVisitsCreate = "sales.visits.create";
+    public const string SalesVisitsEdit = "sales.visits.edit";
+    public const string SalesVisitsComplete = "sales.visits.complete";
+    public const string SalesOffersView = "sales.offers.view";
+    public const string SalesOffersCreate = "sales.offers.create";
+    public const string SalesOffersEdit = "sales.offers.edit";
+    public const string SalesOffersSubmit = "sales.offers.submit";
+    public const string SalesOffersAutoApprove = "sales.offers.auto_approve";
+    public const string SalesOffersApprove = "sales.offers.approve";
+    public const string SalesOffersCancel = "sales.offers.cancel";
+
+    public static readonly string[] SalesOperator =
+    [
+        SalesVisitsView,
+        SalesVisitsCreate,
+        SalesVisitsEdit,
+        SalesVisitsComplete,
+        SalesOffersView,
+        SalesOffersCreate,
+        SalesOffersEdit,
+        SalesOffersSubmit,
+        SalesOffersAutoApprove,
+        SalesOffersCancel
+    ];
+
+    public static readonly string[] SalesManager =
+    [
+        SalesVisitsView,
+        SalesOffersView,
+        SalesOffersApprove
+    ];
+
+    public static readonly string[] CrmOperator =
+    [
+        CrmCustomersView,
+        CrmCustomersEdit,
+        CrmLeadsView,
+        CrmLeadsCreate,
+        CrmLeadsWork
+    ];
+
+    public static readonly string[] CrmManager =
+    [
+        .. CrmOperator,
+        CrmCustomersMerge,
+        CrmLeadsAssign,
+        .. SalesOperator,
+        .. SalesManager
+    ];
+
+    public static readonly string[] QualityManager =
+    [
+        QualityView,
+        QualityCreate,
+        QualityDecide
+    ];
+
+    public static readonly string[] ListingOperator =
+    [
+        ListingsView,
+        ListingsEdit,
+        ListingsPublish
+    ];
+
+    public static readonly string[] OperationsOperator =
+    [
+        OperationsView,
+        OperationsCreate,
+        OperationsEdit,
+        OperationsComplete
+    ];
+
+    public static readonly string[] OperationsManager =
+    [
+        OperationsView,
+        OperationsApproveOverrun,
+        OperationsManageSettlement
+    ];
 
     public static readonly string[] ReconditioningOperator =
     [
@@ -51,6 +149,11 @@ public static class Permissions
         .. InspectionOperator,
         VehicleInspectionsManageTemplates,
         .. ReconditioningOperator,
-        ReconditioningApprove
+        ReconditioningApprove,
+        .. OperationsOperator,
+        .. OperationsManager,
+        .. QualityManager,
+        .. ListingOperator,
+        .. CrmManager
     ];
 }

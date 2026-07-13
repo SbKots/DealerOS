@@ -13,6 +13,13 @@
   <Folder Name="/modules/Organizations/">
     <Project Path="modules/Organizations/DealerOS.Modules.Organizations.csproj" />
   </Folder>
+  <Folder Name="/modules/Operations/">
+  <Project Path="modules/Operations/DealerOS.Modules.Operations.csproj" />
+  <Project Path="modules/Crm/DealerOS.Modules.Crm.csproj" />
+  </Folder>
+  <Folder Name="/modules/Sales/">
+    <Project Path="modules/Sales/DealerOS.Modules.Sales.csproj" />
+  </Folder>
   <Folder Name="/modules/Reconditioning/">
     <Project Path="modules/Reconditioning/DealerOS.Modules.Reconditioning.csproj" />
   </Folder>

@@ -1,3 +1,5 @@
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -13,8 +15,17 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
         .WithUsername("dealeros")
         .WithPassword("dealeros")
         .Build();
+    private readonly IContainer _minio = new ContainerBuilder("minio/minio:RELEASE.2025-09-07T16-13-09Z")
+        .WithEnvironment("MINIO_ROOT_USER", "dealer-test")
+        .WithEnvironment("MINIO_ROOT_PASSWORD", "dealer-test-secret")
+        .WithPortBinding(9000, true)
+        .WithCommand("server", "/data")
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request
+            .ForPort(9000).ForPath("/minio/health/live")))
+        .Build();
 
     public string ConnectionString { get; private set; } = string.Empty;
+    public string ObjectStorageEndpoint { get; private set; } = string.Empty;
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -43,12 +54,13 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
         {
             if (ConnectionString.Length > 0) return;
 
-            await _postgres.StartAsync();
+            await Task.WhenAll(_postgres.StartAsync(), _minio.StartAsync());
             ConnectionString = new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString())
             {
                 Pooling = false,
                 SslMode = SslMode.Disable
             }.ConnectionString;
+            ObjectStorageEndpoint = $"localhost:{_minio.GetMappedPublicPort(9000)}";
         }
         finally
         {
@@ -116,7 +128,7 @@ public sealed class ReconditioningPostgresFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _postgres.DisposeAsync();
+        await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _minio.DisposeAsync().AsTask());
         _testGate.Dispose();
         _startGate.Dispose();
     }
