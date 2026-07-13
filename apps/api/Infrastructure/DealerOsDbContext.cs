@@ -35,6 +35,12 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
     public DbSet<WorkOrderMaterialMovement> WorkOrderMaterialMovements => Set<WorkOrderMaterialMovement>();
     public DbSet<ExecutionOverrunDecision> ExecutionOverrunDecisions => Set<ExecutionOverrunDecision>();
     public DbSet<ExecutionNotification> ExecutionNotifications => Set<ExecutionNotification>();
+    public DbSet<QualityCheck> QualityChecks => Set<QualityCheck>();
+    public DbSet<QualityObservation> QualityObservations => Set<QualityObservation>();
+    public DbSet<VehicleMedia> VehicleMedia => Set<VehicleMedia>();
+    public DbSet<ListingContent> ListingContents => Set<ListingContent>();
+    public DbSet<ChannelPublication> ChannelPublications => Set<ChannelPublication>();
+    public DbSet<ListingContentHistory> ListingContentHistory => Set<ListingContentHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -99,9 +105,9 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
                 table.HasCheckConstraint("ck_vehicles_mileage", "\"MileageKm\" >= 0 AND \"MileageKm\" <= 3000000");
                 table.HasCheckConstraint("ck_vehicles_purchase_amount", "\"PlannedPurchaseAmount\" > 0");
                 table.HasCheckConstraint("ck_vehicles_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
-                table.HasCheckConstraint("ck_vehicles_status", "\"Status\" IN (1, 2, 3, 4, 5)");
+                table.HasCheckConstraint("ck_vehicles_status", "\"Status\" IN (1, 2, 3, 4, 5, 6)");
                 table.HasCheckConstraint("ck_vehicles_version", "\"Version\" > 0");
-                table.HasCheckConstraint("ck_vehicles_acceptance_state", "(\"Status\" = 1 AND \"AcceptedAt\" IS NULL AND \"StockNumber\" IS NULL) OR (\"Status\" IN (2, 3, 4, 5) AND \"AcceptedAt\" IS NOT NULL AND \"StockNumber\" IS NOT NULL)");
+                table.HasCheckConstraint("ck_vehicles_acceptance_state", "(\"Status\" = 1 AND \"AcceptedAt\" IS NULL AND \"StockNumber\" IS NULL) OR (\"Status\" IN (2, 3, 4, 5, 6) AND \"AcceptedAt\" IS NOT NULL AND \"StockNumber\" IS NOT NULL)");
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
@@ -132,8 +138,8 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
         {
             entity.ToTable("status_history", "vehicles", table =>
             {
-                table.HasCheckConstraint("ck_status_history_from", "\"FromStatus\" IS NULL OR \"FromStatus\" IN (1, 2, 3, 4, 5)");
-                table.HasCheckConstraint("ck_status_history_to", "\"ToStatus\" IN (1, 2, 3, 4, 5)");
+                table.HasCheckConstraint("ck_status_history_from", "\"FromStatus\" IS NULL OR \"FromStatus\" IN (1, 2, 3, 4, 5, 6)");
+                table.HasCheckConstraint("ck_status_history_to", "\"ToStatus\" IN (1, 2, 3, 4, 5, 6)");
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
@@ -683,6 +689,151 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             entity.HasOne<ExecutionWorkOrder>().WithMany()
                 .HasForeignKey(x => new { x.OrganizationId, x.WorkOrderId })
                 .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<QualityCheck>(entity =>
+        {
+            entity.ToTable("quality_checks", "operations", table =>
+            {
+                table.HasCheckConstraint("ck_quality_status", "\"Status\" BETWEEN 1 AND 4");
+                table.HasCheckConstraint("ck_quality_revision", "\"Revision\" > 0");
+                table.HasCheckConstraint("ck_quality_version", "\"Version\" > 0");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_quality_organization_id");
+            entity.Property(x => x.ChecklistSnapshotJson).HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.DecisionComment).HasMaxLength(2000);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.OrganizationId, x.ExecutionId, x.Revision }).IsUnique()
+                .HasDatabaseName("ux_quality_execution_revision");
+            entity.HasIndex(x => new { x.OrganizationId, x.ExecutionId }).IsUnique()
+                .HasFilter("\"Status\" = 1").HasDatabaseName("ux_quality_execution_draft");
+            entity.HasOne<ReconditioningExecution>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.ExecutionId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Vehicle>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.DecidedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.Navigation(x => x.Observations).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<QualityObservation>(entity =>
+        {
+            entity.ToTable("quality_observations", "operations", table =>
+                table.HasCheckConstraint("ck_quality_observation_severity", "\"Severity\" BETWEEN 1 AND 3"));
+            entity.HasKey(x => new { x.OrganizationId, x.QualityCheckId, x.Id });
+            entity.Property(x => x.Id).ValueGeneratedNever(); entity.Property(x => x.Comment).HasMaxLength(2000);
+            entity.HasOne<QualityCheck>().WithMany(x => x.Observations)
+                .HasForeignKey(x => new { x.OrganizationId, x.QualityCheckId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ExecutionWorkOrder>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, Id = x.WorkOrderId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.HasOne<InspectionDefect>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, Id = x.DefectId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+        });
+
+        modelBuilder.Entity<VehicleMedia>(entity =>
+        {
+            entity.ToTable("vehicle_media", "operations", table =>
+            {
+                table.HasCheckConstraint("ck_vehicle_media_category", "\"Category\" BETWEEN 1 AND 4");
+                table.HasCheckConstraint("ck_vehicle_media_size", "\"SizeBytes\" > 0");
+                table.HasCheckConstraint("ck_vehicle_media_sort", "\"SortOrder\" >= 0");
+                table.HasCheckConstraint("ck_vehicle_media_version", "\"Version\" > 0");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_vehicle_media_organization_id");
+            entity.Property(x => x.ObjectKey).HasMaxLength(600).IsRequired();
+            entity.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            entity.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => x.ObjectKey).IsUnique().HasDatabaseName("ux_vehicle_media_object_key");
+            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId }).IsUnique().HasFilter("\"IsCover\"")
+                .HasDatabaseName("ux_vehicle_media_cover");
+            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId, x.SortOrder });
+            entity.HasOne<Vehicle>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ListingContent>(entity =>
+        {
+            entity.ToTable("listing_contents", "operations", table =>
+            {
+                table.HasCheckConstraint("ck_listing_status", "\"Status\" IN (1, 2)");
+                table.HasCheckConstraint("ck_listing_revision", "\"Revision\" > 0");
+                table.HasCheckConstraint("ck_listing_price", "\"PublicPriceAmount\" >= 0");
+                table.HasCheckConstraint("ck_listing_version", "\"Version\" > 0");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_listing_organization_id");
+            entity.Property(x => x.VehicleMake).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.VehicleModel).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Equipment).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.Advantages).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.ConditionDescription).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.PublicPriceAmount).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.TemplateName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.SnapshotJson).HasColumnType("jsonb");
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId, x.Revision }).IsUnique()
+                .HasDatabaseName("ux_listing_vehicle_revision");
+            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId }).IsUnique().HasFilter("\"Status\" = 1")
+                .HasDatabaseName("ux_listing_vehicle_draft");
+            entity.HasOne<Vehicle>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.Publications).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.History).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ChannelPublication>(entity =>
+        {
+            entity.ToTable("channel_publications", "operations", table =>
+                table.HasCheckConstraint("ck_channel_publication_status", "\"Status\" BETWEEN 1 AND 5"));
+            entity.HasKey(x => new { x.OrganizationId, x.ListingContentId, x.Id });
+            entity.Property(x => x.Id).ValueGeneratedNever(); entity.Property(x => x.Channel).HasMaxLength(100);
+            entity.Property(x => x.ExternalId).HasMaxLength(200); entity.Property(x => x.ExternalUrl).HasMaxLength(1000);
+            entity.Property(x => x.Error).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.OrganizationId, x.ListingContentId, x.Channel }).IsUnique()
+                .HasDatabaseName("ux_channel_publication_listing_channel");
+            entity.HasOne<ListingContent>().WithMany(x => x.Publications)
+                .HasForeignKey(x => new { x.OrganizationId, x.ListingContentId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ListingContentHistory>(entity =>
+        {
+            entity.ToTable("listing_history", "operations");
+            entity.HasKey(x => new { x.OrganizationId, x.ListingContentId, x.Id });
+            entity.Property(x => x.Id).ValueGeneratedNever(); entity.Property(x => x.Action).HasMaxLength(50);
+            entity.Property(x => x.Signature).HasColumnType("text");
+            entity.Property(x => x.PublicPriceAmount).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3);
+            entity.HasIndex(x => new { x.OrganizationId, x.ListingContentId, x.CommandId }).IsUnique()
+                .HasDatabaseName("ux_listing_history_command");
+            entity.HasOne<ListingContent>().WithMany(x => x.History)
+                .HasForeignKey(x => new { x.OrganizationId, x.ListingContentId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

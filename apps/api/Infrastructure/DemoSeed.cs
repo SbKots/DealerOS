@@ -48,21 +48,25 @@ public static class DemoSeed
         if (!await db.Users.AnyAsync(x => x.Id == VolgaReconditioningUserId, cancellationToken))
             AddUser(db, hasher, VolgaReconditioningUserId, VolgaOrganizationId, VolgaBranchId,
                 "prep@volga-auto.demo", "Елена Подготовка",
-                [Permissions.VehiclesRead, .. Permissions.ReconditioningOperator, .. Permissions.OperationsOperator]);
+                [Permissions.VehiclesRead, .. Permissions.ReconditioningOperator, .. Permissions.OperationsOperator,
+                    .. Permissions.ListingOperator]);
         if (!await db.Users.AnyAsync(x => x.Id == VolgaManagerUserId, cancellationToken))
             AddUser(db, hasher, VolgaManagerUserId, VolgaOrganizationId, VolgaBranchId,
                 "manager@volga-auto.demo", "Марина Руководитель",
-                [Permissions.VehiclesRead, .. Permissions.ReconditioningManager, .. Permissions.OperationsManager]);
+                [Permissions.VehiclesRead, .. Permissions.ReconditioningManager, .. Permissions.OperationsManager,
+                    .. Permissions.QualityManager, Permissions.ListingsView]);
         await db.SaveChangesAsync(cancellationToken);
 
         await EnsurePermissionsAsync(db, VolgaAdminUserId, Permissions.VehicleOperator, cancellationToken);
         await EnsurePermissionsAsync(db, NorthAdminUserId, Permissions.VehicleOperator, cancellationToken);
         await EnsurePermissionsAsync(db, VolgaInspectorUserId, Permissions.InspectionOperator, cancellationToken);
         await EnsurePermissionsAsync(db, VolgaReconditioningUserId,
-            [Permissions.VehiclesRead, .. Permissions.ReconditioningOperator, .. Permissions.OperationsOperator],
+            [Permissions.VehiclesRead, .. Permissions.ReconditioningOperator, .. Permissions.OperationsOperator,
+                .. Permissions.ListingOperator],
             cancellationToken);
         await EnsurePermissionsAsync(db, VolgaManagerUserId,
-            [Permissions.VehiclesRead, .. Permissions.ReconditioningManager, .. Permissions.OperationsManager],
+            [Permissions.VehiclesRead, .. Permissions.ReconditioningManager, .. Permissions.OperationsManager,
+                .. Permissions.QualityManager, Permissions.ListingsView],
             cancellationToken);
 
         if (!await db.InspectionTemplates.AnyAsync(x => x.Id == VolgaTemplateId, cancellationToken))

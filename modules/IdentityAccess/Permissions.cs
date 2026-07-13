@@ -23,6 +23,26 @@ public static class Permissions
     public const string OperationsComplete = "operations.complete";
     public const string OperationsApproveOverrun = "operations.approve_overrun";
     public const string OperationsManageSettlement = "operations.manage_settlement";
+    public const string QualityView = "quality.view";
+    public const string QualityCreate = "quality.create";
+    public const string QualityDecide = "quality.decide";
+    public const string ListingsView = "listings.view";
+    public const string ListingsEdit = "listings.edit";
+    public const string ListingsPublish = "listings.publish";
+
+    public static readonly string[] QualityManager =
+    [
+        QualityView,
+        QualityCreate,
+        QualityDecide
+    ];
+
+    public static readonly string[] ListingOperator =
+    [
+        ListingsView,
+        ListingsEdit,
+        ListingsPublish
+    ];
 
     public static readonly string[] OperationsOperator =
     [
@@ -74,6 +94,8 @@ public static class Permissions
         .. ReconditioningOperator,
         ReconditioningApprove,
         .. OperationsOperator,
-        .. OperationsManager
+        .. OperationsManager,
+        .. QualityManager,
+        .. ListingOperator
     ];
 }

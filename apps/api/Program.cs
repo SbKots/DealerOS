@@ -72,6 +72,10 @@ builder.Services.AddScoped<ReconditioningService>();
 builder.Services.AddScoped<OperationsStore>();
 builder.Services.AddScoped<IOperationsStore>(sp => sp.GetRequiredService<OperationsStore>());
 builder.Services.AddScoped<OperationsService>();
+builder.Services.AddScoped<QualityListingStore>();
+builder.Services.AddScoped<IQualityListingStore>(sp => sp.GetRequiredService<QualityListingStore>());
+builder.Services.AddScoped<QualityControlService>();
+builder.Services.AddScoped<MediaListingService>();
 builder.Services.AddHostedService<OperationsDeadlineWorker>();
 builder.Services.AddSingleton<IMinioClient>(_ =>
 {
@@ -182,6 +186,7 @@ app.MapVehicleEndpoints();
 app.MapInspectionEndpoints();
 app.MapReconditioningEndpoints();
 app.MapOperationsEndpoints();
+app.MapQualityListingEndpoints();
 app.Run();
 
 public partial class Program;

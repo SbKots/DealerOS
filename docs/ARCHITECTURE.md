@@ -48,6 +48,11 @@ Approved -- create-revision --> Draft(revision + 1)
 Execution Draft -- start --> InProgress -- complete(all mandatory work + budget decision) --> Completed
 Work Scheduled -- start --> InProgress -- block/resume --> Blocked/InProgress
 Work InProgress -- complete --> Completed -- return-for-rework --> ReturnedForRework
+
+Execution Completed -- QC Pass --> Vehicle ReadyForSale
+Execution Completed -- QC ReworkRequired --> selected work ReturnedForRework --> new QC revision
+Listing Draft -- ready(required media + cover + content) --> Listing Ready
+Channel Draft -- manual export --> Exported -- explicit confirmation --> Published -- unpublish --> Unpublished
 ```
 
 `InspectionPassed` означает только техническое прохождение осмотра без дефектов, требующих подготовки или блокирующих продажу. Это не полная готовность к продаже: будущий `ReadyForSale` может быть установлен только после подготовки и контроля качества в следующем процессе. Повторный переход запрещён доменом. Универсального PATCH статуса нет. Каждое создание/принятие создаёт status history и audit event в одном `SaveChanges`.
@@ -73,6 +78,14 @@ Approved не редактируется. Новая ревизия копиру
 `ReconditioningExecution` создаётся только из точного immutable `ApprovedBudgetSnapshot`; tenant-aware unique constraint разрешает одно исполнение snapshot. Заказ-работы получают snapshot состава плана и дальше изменяются отдельными командами, защищёнными `Version`. Фактические labor, material и external суммы хранятся как `decimal(19,2) + currency`; расход и возврат материала — идемпотентные движения с отдельным command ID.
 
 Завершение требует исполнения всех обязательных работ, урегулированного внешнего расчёта и отдельного решения при превышении лимита. Решение о перерасходе идемпотентно по decision ID, не может менять валюту и при включённом независимом согласовании недоступно автору execution. Фоновый worker с отложенным первым циклом создаёт tenant-aware дедуплицированные уведомления `DueSoon/Overdue`; ручная команда оставлена для демонстрации и детерминированных тестов.
+
+## Контроль качества и listing
+
+`QualityCheck` — отдельная ревизия над завершённым execution с actor/time и JSON checklist snapshot. Pass запрещён при блокирующих замечаниях; rework ссылается на конкретные work order/defect, переоткрывает только выбранные работы и не меняет предыдущую QC-ревизию. Только отдельная команда Pass независимого контролёра переводит `ReconditioningRequired -> ReadyForSale` и пишет status history/audit в одной транзакции.
+
+`VehicleMedia` хранит tenant/branch/vehicle metadata приватного объекта. Pipeline повторно использует decode/re-encode и лимиты Inspections; каждая upload attempt имеет уникальный object key, а конфликт удаляет только собственный объект. Категории: `Exterior`, `Interior`, `DamageHistory`, `DocumentsInternal`; внутренние документы не могут быть cover и не входят в публичный snapshot.
+
+`ListingContent` хранит snapshot характеристик, контента, цены, template/version и упорядоченных media. `Ready` неизменяем, требует Exterior/Interior/DamageHistory и ровно одну cover. Manual export создаёт только `Exported`; `Published` появляется исключительно отдельной командой после фактического подтверждения сотрудником. Command ID, optimistic concurrency, history и audit защищают историю цены, контента и публикаций.
 
 ## Данные
 

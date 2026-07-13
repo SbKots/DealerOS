@@ -33,12 +33,20 @@
 - план/лимит/факт/variance и отдельное идемпотентное решение о перерасходе;
 - tenant-aware constraints, optimistic concurrency, аудит и PostgreSQL/component tests.
 
-## Следующая итерация 0.5 — контроль качества и публикационная готовность
+## Готово в коде — итерация 0.5
 
-1. QC gate, замечания и повторные работы.
-2. Переход в полную `ReadyForSale` только после успешного QC.
-3. Media/content completeness и immutable listing snapshot.
-4. Ручной export/publication journal без внешней интеграции.
+- QC gate, замечания конкретным работам и неизменяемые повторные попытки;
+- полная `ReadyForSale` только после успешного независимого QC;
+- безопасные media, обязательные категории, cover/order и Content Pack;
+- immutable Listing Ready snapshot и manual JSON export;
+- ручной journal Draft/Exported/Published/Failed/Unpublished без ложной интеграции.
+
+## Следующая итерация 0.6 — Customer и Lead
+
+1. Tenant-aware Customer и дедупликация контактов.
+2. Lead source/vehicle/channel/owner/status и activity timeline.
+3. First-response SLA, очередь и просрочки.
+4. Безопасное merge дублей с аудитом.
 
 ## Позже по MVP
 

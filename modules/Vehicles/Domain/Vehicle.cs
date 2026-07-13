@@ -106,6 +106,15 @@ public sealed class Vehicle
         TransitionTo(VehicleStatus.InStock, now, actorUserId);
     }
 
+    public void MarkReadyForSale(DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status == VehicleStatus.ReadyForSale) return;
+        if (Status != VehicleStatus.ReconditioningRequired)
+            throw new DomainException("vehicle.ready_requires_reconditioning",
+                "ReadyForSale устанавливается только после подготовки и успешного контроля качества.");
+        TransitionTo(VehicleStatus.ReadyForSale, now, actorUserId);
+    }
+
     private void TransitionTo(VehicleStatus next, DateTimeOffset now, Guid actorUserId)
     {
         var previous = Status;

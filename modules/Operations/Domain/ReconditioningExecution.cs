@@ -155,10 +155,14 @@ public sealed class ReconditioningExecution
     public void ReturnWorkForRework(Guid workOrderId, string? reason, long expectedVersion, DateTimeOffset now)
     {
         EnsureVersion(expectedVersion);
-        if (Status == ReconditioningExecutionStatus.Completed)
-            throw new DomainException("operations.execution_completed", "Завершённый execution изменяется только через QC rework.");
+        if (Status != ReconditioningExecutionStatus.Completed
+            && !(Status == ReconditioningExecutionStatus.InProgress
+                 && _workOrders.Any(x => x.Status == WorkOrderStatus.ReturnedForRework)))
+            throw new DomainException("operations.qc_rework_requires_completed",
+                "Возврат из контроля качества доступен только для завершённого execution.");
         FindWork(workOrderId).ReturnForRework(reason, now);
         Status = ReconditioningExecutionStatus.InProgress;
+        CompletedAt = null;
         Touch(now);
     }
 
