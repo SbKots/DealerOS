@@ -8,6 +8,7 @@
 .env
 .env.*
 !.env.example
+!**/.env.pages
 .dealer_prompt.tmp
 .vs/
 .idea/

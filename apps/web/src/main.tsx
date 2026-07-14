@@ -2,10 +2,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
+import DemoApp from './DemoApp'
 import './index.css'
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } })
 
+const RootApp = import.meta.env.VITE_DEMO_MODE === 'true' ? DemoApp : App
+
 createRoot(document.getElementById('root')!).render(
-  <StrictMode><QueryClientProvider client={queryClient}><App /></QueryClientProvider></StrictMode>,
+  <StrictMode><QueryClientProvider client={queryClient}><RootApp /></QueryClientProvider></StrictMode>,
 )

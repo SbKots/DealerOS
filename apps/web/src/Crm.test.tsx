@@ -34,7 +34,7 @@ describe('CrmWorkspace', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Создать клиента' }))
     expect(await screen.findByText('Возможный дубль')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: `Предпросмотр: ${duplicate.name}` }))
-    expect(await screen.findByText('Будет перемещено лидов: 2')).toBeInTheDocument()
+    expect(await screen.findByText('Будет перемещено обращений: 2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: `Подтвердить объединение с ${duplicate.name}` })).toBeEnabled()
   })
 
@@ -61,11 +61,11 @@ describe('CrmWorkspace', () => {
     const leadButton = (await screen.findByText('Кроссовер до 2 млн ₽ · Входящий звонок')).closest('button')!
     expect(leadButton).toHaveTextContent('SLA просрочен')
     await userEvent.click(leadButton)
-    await userEvent.click(screen.getByRole('button', { name: 'Назначить round-robin' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Назначить автоматически' }))
     expect(await screen.findByText('Анна Руководитель')).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Итог первого контакта'), 'Клиент подтвердил интерес')
     await userEvent.click(screen.getByRole('button', { name: 'Зафиксировать первый контакт' }))
-    expect(await screen.findByText('Call · Outbound')).toBeInTheDocument()
-    expect(screen.getByText('FirstContact', { selector: 'span' })).toBeInTheDocument()
+    expect(await screen.findByText('Звонок · Исходящий')).toBeInTheDocument()
+    expect(screen.getByText('Первый контакт', { selector: 'span' })).toBeInTheDocument()
   })
 })

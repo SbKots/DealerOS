@@ -57,9 +57,9 @@ describe('FinanceWorkspace', () => {
     })
     setup()
     await userEvent.click(await screen.findByRole('button', { name: 'Источники →' }))
-    expect(await screen.findByText('Продажа (Deal)')).toBeInTheDocument()
-    expect(screen.getByText('Подготовка (Operations)')).toBeInTheDocument()
-    expect(screen.getByText(/Revision 2/)).toBeInTheDocument()
+    expect(await screen.findByText('Продажа')).toBeInTheDocument()
+    expect(screen.getByText('Подготовка')).toBeInTheDocument()
+    expect(screen.getByText(/Ревизия 2/)).toBeInTheDocument()
     expect(screen.getByText(/SHA-256 aaaaaaaaaaaa/)).toBeInTheDocument()
   })
 

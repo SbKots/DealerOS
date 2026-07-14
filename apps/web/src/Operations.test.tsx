@@ -41,7 +41,7 @@ describe('OperationsWorkspace', () => {
     setup()
     await userEvent.click(await screen.findByRole('button', { name: 'Открыть выполнение' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Начать выполнение' }))
-    await waitFor(() => expect(screen.getByText('Execution · InProgress')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Выполнение · В работе')).toBeInTheDocument())
     expect(fetch).toHaveBeenLastCalledWith(expect.stringContaining('/start'), expect.objectContaining({ body: JSON.stringify({ expectedVersion: 1 }) }))
   })
 

@@ -7,7 +7,9 @@ test('employee creates an intake and accepts the vehicle to stock', async ({ pag
   const vin = `JHMCM56557C${Math.floor(100000 + Math.random() * 899999)}`
   await page.goto('/')
   await page.getByRole('button', { name: 'Войти в DealerOS' }).click()
-  await expect(page.getByRole('heading', { name: 'Приём автомобиля' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Обзор' })).toBeVisible()
+  await page.getByRole('navigation', { name: 'Разделы' }).getByRole('button', { name: 'Приёмка' }).click()
+  await expect(page.getByRole('heading', { name: 'Приёмка и реестр' })).toBeVisible()
 
   await page.getByLabel('VIN').fill(vin)
   await page.getByLabel('Марка').fill('Honda')
@@ -19,6 +21,7 @@ test('employee creates an intake and accepts the vehicle to stock', async ({ pag
 
   await expect(page.getByText(vin).first()).toBeVisible()
   await page.reload()
+  await page.getByRole('navigation', { name: 'Разделы' }).getByRole('button', { name: 'Приёмка' }).click()
   await expect(page.getByText(vin).first()).toBeVisible()
   await page.getByRole('row').filter({ hasText: vin }).click()
   await page.getByRole('button', { name: /Принять на склад/ }).click()
@@ -32,7 +35,9 @@ test('tablet intake form exposes validation without a server round trip', async 
   await page.setViewportSize({ width: 820, height: 1180 })
   await page.goto('/')
   await page.getByRole('button', { name: 'Войти в DealerOS' }).click()
-  await expect(page.getByRole('heading', { name: 'Приём автомобиля' })).toBeVisible()
+  await page.getByRole('button', { name: 'Открыть меню' }).click()
+  await page.getByRole('navigation', { name: 'Разделы' }).getByRole('button', { name: 'Приёмка' }).click()
+  await expect(page.getByRole('heading', { name: 'Приёмка и реестр' })).toBeVisible()
 
   await page.getByLabel('VIN').fill('INVALID')
   await page.getByRole('button', { name: 'Создать поступление' }).click()

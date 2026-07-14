@@ -116,13 +116,13 @@ export function InspectionsWorkspace({ focusVehicle, onClearFocus }: {
         <button className="link-button dark" onClick={onClearFocus}>Вся очередь</button></div>
       {!history.data?.length ? <div className="empty-inline"><span>Осмотров ещё нет.</span><button className="primary compact" onClick={() => start(focusVehicle)} disabled={busy}>Начать осмотр</button></div>
         : <div className="history-list">{history.data.map((entry) => <button key={entry.id} onClick={() => { setActiveId(entry.id); setDetail(null) }}>
-          <strong>Ревизия {entry.revision} · {entry.status}</strong><span>{entry.templateName} v{entry.templateVersion} · дефектов: {entry.defectCount}</span>
+          <strong>Ревизия {entry.revision} · {inspectionStatusLabel(entry.status)}</strong><span>{entry.templateName} v{entry.templateVersion} · дефектов: {entry.defectCount}</span>
         </button>)}</div>}
     </section>}
 
     {!detail && !focusVehicle && <section className="registry inspection-queue">
       <div><p className="eyebrow">Рабочая очередь</p><h2>Автомобили для осмотра</h2></div>
-      {!queue.data?.length ? <div className="empty-inline">В доступных филиалах нет автомобилей со статусом InStock.</div>
+      {!queue.data?.length ? <div className="empty-inline">В доступных филиалах нет автомобилей, принятых на склад и ожидающих осмотра.</div>
         : <div className="queue-grid">{queue.data.map((vehicle) => <article key={vehicle.id} className="queue-card">
           <span className="status draft"><i />Ожидает</span><h3>{vehicle.make} {vehicle.model}</h3><p className="mono">{vehicle.vin}</p>
           <dl><div><dt>Пробег</dt><dd>{vehicle.mileageKm.toLocaleString('ru-RU')} км</dd></div><div><dt>Филиал</dt><dd>{vehicle.branchName}</dd></div></dl>
@@ -161,7 +161,7 @@ function InspectionForm({ detail, progress, busy, confirmComplete, finalComment,
   const [itemComments, setItemComments] = useState<Record<string, string>>({})
   const [defect, setDefect] = useState({ category: 'Body', title: '', description: '', severity: 'Minor', recommendation: '', estimatedRepairAmount: '', repairRequired: true, blocksPublication: false, blocksTestDrive: false, blocksSale: false })
   return <section className="inspection-form">
-    <div className="inspection-toolbar"><button className="link-button dark" onClick={onBack}>← К очереди</button><span className={`status ${readOnly ? 'success' : 'draft'}`}><i />{detail.status}</span><span className="mono">rev. {detail.revision} · v{detail.version}</span></div>
+    <div className="inspection-toolbar"><button className="link-button dark" onClick={onBack}>← К очереди</button><span className={`status ${readOnly ? 'success' : 'draft'}`}><i />{inspectionStatusLabel(detail.status)}</span><span className="mono">рев. {detail.revision} · версия {detail.version}</span></div>
     <div className="inspection-summary"><div><p className="eyebrow">{detail.templateName} v{detail.templateVersion}</p><h2>Осмотр автомобиля</h2><p>{detail.branchName} · {detail.mileageKm.toLocaleString('ru-RU')} км · диагност {detail.inspectorName}</p></div>
       <div className="progress-block"><strong>{progress}%</strong><span>чек-листа</span><div><i style={{ width: `${progress}%` }} /></div></div></div>
     {readOnly && <div className={detail.needsReconditioning ? 'critical-banner' : 'success-banner'} role="status"><strong>Результат зафиксирован и доступен только для чтения.</strong><span>{detail.needsReconditioning ? 'Следующее действие: открыть раздел «Подготовка» и создать план работ.' : 'Автомобиль готов к следующему этапу.'}</span></div>}
@@ -172,7 +172,7 @@ function InspectionForm({ detail, progress, busy, confirmComplete, finalComment,
           {!readOnly && <input aria-label={`Комментарий: ${item.label}`} placeholder="Комментарий к пункту" value={itemComments[item.id] ?? item.comment ?? ''} onChange={(event) => setItemComments((state) => ({ ...state, [item.id]: event.target.value }))} />}
         </div></article>)}</div>
       <aside className="defects-panel"><h2>Дефекты <span>{detail.defects.length}</span></h2>
-        {detail.defects.map((entry) => <article key={entry.id} className={`defect-card ${entry.severity.toLowerCase()}`}><div><span className="severity">{entry.severity}</span><strong>{entry.title}</strong></div><p>{entry.description}</p>
+        {detail.defects.map((entry) => <article key={entry.id} className={`defect-card ${entry.severity.toLowerCase()}`}><div><span className="severity">{severityLabel(entry.severity)}</span><strong>{entry.title}</strong></div><p>{entry.description}</p>
           <div className="block-tags">{entry.repairRequired && <span>Требует ремонта</span>}{entry.blocksSale && <span>Продажа заблокирована</span>}{entry.blocksTestDrive && <span>Без тест-драйва</span>}</div>
           <div className="photos">{entry.photos.map((photo) => <AuthorizedPhoto key={photo.id} photo={photo} />)}{!readOnly && <label className="photo-upload">+ Фото<input aria-label={`Фото: ${entry.title}`} type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; if (file) onPhoto(entry.id, file) }} /></label>}</div>
         </article>)}
@@ -180,7 +180,7 @@ function InspectionForm({ detail, progress, busy, confirmComplete, finalComment,
           <h3>Новый дефект</h3><label>Категория<select aria-label="Категория дефекта" value={defect.category} onChange={(event) => setDefect({ ...defect, category: event.target.value })}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label>Название<input aria-label="Название дефекта" required maxLength={160} value={defect.title} onChange={(event) => setDefect({ ...defect, title: event.target.value })} /></label>
           <label>Описание<textarea aria-label="Описание дефекта" required maxLength={2000} value={defect.description} onChange={(event) => setDefect({ ...defect, description: event.target.value })} /></label>
-          <label>Серьёзность<select aria-label="Серьёзность" value={defect.severity} onChange={(event) => setDefect({ ...defect, severity: event.target.value })}><option>Minor</option><option>Major</option><option>Critical</option></select></label>
+          <label>Серьёзность<select aria-label="Серьёзность" value={defect.severity} onChange={(event) => setDefect({ ...defect, severity: event.target.value })}><option value="Minor">Незначительный</option><option value="Major">Серьёзный</option><option value="Critical">Критический</option></select></label>
           <label>Оценка ремонта, ₽<input aria-label="Оценка ремонта" type="number" min="0" value={defect.estimatedRepairAmount} onChange={(event) => setDefect({ ...defect, estimatedRepairAmount: event.target.value })} /></label>
           <div className="defect-checks"><label><input type="checkbox" checked={defect.repairRequired} onChange={(event) => setDefect({ ...defect, repairRequired: event.target.checked })} />Требует устранения</label><label><input type="checkbox" checked={defect.blocksSale} onChange={(event) => setDefect({ ...defect, blocksSale: event.target.checked })} />Блокирует продажу</label></div>
           {defect.severity === 'Critical' && <div className="critical-note">Сервер принудительно включит ремонт и блокировку продажи.</div>}
@@ -202,3 +202,6 @@ function AuthorizedPhoto({ photo }: { photo: InspectionPhoto }) {
   }, [photo.downloadUrl])
   return url ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={photo.originalFileName} /></a> : <span className="photo-placeholder">Фото</span>
 }
+
+function inspectionStatusLabel(status: string) { return ({ Draft: 'Черновик', InProgress: 'В работе', Completed: 'Завершён', Cancelled: 'Отменён' } as Record<string, string>)[status] ?? status }
+function severityLabel(severity: string) { return ({ Minor: 'Незначительный', Major: 'Серьёзный', Critical: 'Критический' } as Record<string, string>)[severity] ?? severity }

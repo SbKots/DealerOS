@@ -50,6 +50,11 @@ jobs:
         with:
           name: frontend-build
           path: apps/web/dist
+      - run: npm run build:pages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pages-demo-build
+          path: apps/web/dist
 
   e2e:
     runs-on: ubuntu-latest

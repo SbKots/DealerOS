@@ -23,10 +23,10 @@ describe('QualityListingsWorkspace', () => {
       throw new Error(`Unexpected ${url}`)
     })
     setup(['quality.view', 'quality.create', 'quality.decide'])
-    await userEvent.click(await screen.findByRole('button', { name: 'Открыть QC' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Открыть контроль качества' }))
     expect(await screen.findByText(/mandatoryWorksCompleted/)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Подтвердить ReadyForSale' }))
-    expect(await screen.findByText(/QC rev. 1 · Passed/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Подтвердить готовность к продаже' }))
+    expect(await screen.findByText(/Контроль, рев. 1 · Проверка пройдена/)).toBeInTheDocument()
   })
 
   it('shows a Ready listing as read-only and distinguishes a confirmed publication', async () => {
@@ -42,7 +42,7 @@ describe('QualityListingsWorkspace', () => {
     setup(['listings.view', 'listings.edit', 'listings.publish'])
     await userEvent.click(await screen.findByRole('button', { name: 'Подготовить объявление' }))
     expect(await screen.findByLabelText('Публичная цена')).toBeDisabled()
-    expect(screen.getByText('demo-channel').closest('p')).toHaveTextContent('Published')
+    expect(screen.getByText('demo-channel').closest('p')).toHaveTextContent('Опубликовано')
   })
 
   it('downloads private media with the authenticated API instead of an unprotected image request', async () => {
