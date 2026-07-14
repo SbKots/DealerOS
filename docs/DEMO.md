@@ -1,4 +1,15 @@
-# Демонстрация DealerOS 0.3–0.9
+# Демонстрация DealerOS 0.1–1.0
+
+## Финальная экономика 1.0
+
+1. Войдите `admin@volga-auto.demo` и завершите Deal до `Completed` по сценарию ниже либо используйте сквозной demo flow.
+2. Откройте «Экономика». Фильтры периода и currency выполняются сервером; разные валюты показаны отдельными группами.
+3. Проверьте Gross/Net Revenue, Total Cost, Actual Profit, average margin, plan/fact variance и days in stock.
+4. Нажмите «Источники»: доступны Deal revenue/refund, Vehicle purchase, Operations actuals, manual costs, formula version, revision и SHA-256.
+5. Добавление manual cost/correction доступно через API и создаёт новую snapshot-ревизию; исходная остаётся неизменной. Negative profit отображается красным, а не блокируется.
+6. Нажмите «Экспорт CSV». Файл не содержит имя, телефон/email клиента, payment contents или документы.
+
+Seed создаёт три безопасные точки показа: `Passat Offer` (Approved Offer), `Passat Reservation` (Active Reservation) и `Passat Deal` (Draft Deal). Все данные синтетические; повторный старт не дублирует их.
 
 ## Сценарий сделки и выдачи
 

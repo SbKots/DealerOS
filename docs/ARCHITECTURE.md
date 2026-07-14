@@ -1,5 +1,13 @@
 # Архитектура
 
+## Дополнение 1.0: Finance и ProfitSnapshot
+
+Модуль `Finance` не создаёт параллельную бухгалтерию. Он читает authoritative purchase из `Vehicle`, completed total/approved snapshot и refunds из `Deal`, фактическую подготовку из `Operations`, а также append-only manual costs только для непредставленных категорий. При `Deal.Completed`, последующем refund или cost correction в той же PostgreSQL-транзакции создаётся новая immutable ревизия `ProfitSnapshot`; предыдущая запись не изменяется.
+
+Формула `DealerOS.Profit.v1`: `GrossRevenue = Deal.FinalTotal`; `NetRevenue = GrossRevenue - completed Refunds`; `TotalCost = Vehicle purchase + completed Operations actuals + active manual costs`; `ActualProfit = NetRevenue - TotalCost`; margin вычисляется только при положительной net revenue банковским округлением. Payment ledger служит reconciliation и не прибавляется к revenue; discount уже включён в Deal total. Все источники snapshot перечислены в JSON, hash SHA-256 защищает повторный идентичный расчёт. Mixed currency блокируется без FX, dashboard группирует показатели по currency.
+
+Tenant-aware FK связывают snapshot/cost с Organization, Branch, Vehicle, Deal и actor. Уникальные `(OrganizationId, DealId, Revision)`, command ID и correction link защищают ревизии и идемпотентность. CSV строится server-side с branch scope, отдельным permission и без customer PII.
+
 ## Дополнение 0.9: Deals, Payment ledger и private PDF
 
 Модуль `Deals` владеет Deal snapshot, append-only Payment/Refund, versioned Document metadata и immutable Handover snapshot. Создание Deal атомарно преобразует `Active Reservation → ConvertedToDeal` и `Vehicle Reserved → SaleInProgress`; завершение одной транзакцией делает Deal `Completed`, Vehicle `Sold` и переводит опубликованные каналы Listing в `Unpublished`. Partial unique constraints и optimistic concurrency исключают две активные/завершённые сделки и два результата конкурентного Complete/Cancel.
@@ -42,6 +50,7 @@ React/Vite -> ASP.NET Core command endpoints -> application services -> aggregat
 - `Sales`: Visit, SalesOffer и ApprovedOfferSnapshot; серверные суммы, approval и неизменяемый коммерческий snapshot.
 - `Reservations`: временная бронь Approved Offer, ручной статус предоплаты, истечение и конкурентная блокировка Vehicle.
 - `Deals`: Deal snapshot, immutable payment/refund ledger, private document revisions и handover gate.
+- `Finance`: immutable plan/fact profit revisions, non-duplicated manual costs, dashboard/drill-down и CSV.
 - `SharedKernel`: только стабильные малые понятия и типы ошибок.
 - `apps/api/Infrastructure`: EF mappings по схемам `identity`, `organizations`, `vehicles`, `audit`; это адаптер, а не место бизнес-правил.
 

@@ -29,6 +29,9 @@
   <Folder Name="/modules/Deals/">
     <Project Path="modules/Deals/DealerOS.Modules.Deals.csproj" />
   </Folder>
+  <Folder Name="/modules/Finance/">
+    <Project Path="modules/Finance/DealerOS.Modules.Finance.csproj" />
+  </Folder>
   <Folder Name="/modules/SharedKernel/">
     <Project Path="modules/SharedKernel/DealerOS.SharedKernel.csproj" />
   </Folder>

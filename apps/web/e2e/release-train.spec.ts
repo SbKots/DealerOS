@@ -6,7 +6,7 @@ const image = (name: string) => ({
   buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
 })
 
-test('release train 0.4-0.9 moves an approved offer through reservation and deal to Sold', async ({ page }) => {
+test('release train 0.4-1.0 moves an approved offer through Sold to auditable profit', async ({ page }) => {
   test.setTimeout(420_000)
   const browserErrors: string[] = []
   page.on('pageerror', (error) => browserErrors.push(error.message))
@@ -212,6 +212,14 @@ test('release train 0.4-0.9 moves an approved offer through reservation and deal
   await page.getByRole('button', { name: 'Выдать автомобиль и завершить Deal' }).click()
   await expect(page.getByText('Автомобиль продан')).toBeVisible()
   await expect(page.locator('.deal-workspace .status')).toContainText('Completed')
+  await navigate(page, 'Экономика')
+  await expect(page.getByRole('heading', { name: 'Экономика проданных автомобилей' })).toBeVisible()
+  const soldRow = page.getByRole('row').filter({ hasText: vin })
+  await expect(soldRow).toContainText(`Volkswagen ${model}`)
+  await soldRow.getByRole('button', { name: 'Источники →' }).click()
+  await expect(page.getByText('Продажа (Deal)')).toBeVisible()
+  await expect(page.getByText('Закупка (Vehicle)')).toBeVisible()
+  await expect(page.getByText(/Revision 1 · Deal completed/)).toBeVisible()
   expect(browserErrors).toEqual([])
 })
 

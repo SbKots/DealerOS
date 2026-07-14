@@ -12,6 +12,7 @@ import { CrmWorkspace } from './Crm'
 import { SalesWorkspace } from './Sales'
 import { ReservationsWorkspace } from './Reservations'
 import { DealsWorkspace } from './Deals'
+import { FinanceWorkspace } from './Finance'
 import './App.css'
 
 const intakeSchema = z.object({
@@ -42,7 +43,7 @@ export default function App() {
   const queryClient = useQueryClient()
   const [authenticated, setAuthenticated] = useState(hasSession())
   const [selected, setSelected] = useState<Vehicle | null>(null)
-  const [view, setView] = useState<'intake' | 'inspections' | 'reconditioning' | 'operations' | 'quality-listings' | 'crm' | 'sales' | 'reservations' | 'deals'>('intake')
+  const [view, setView] = useState<'intake' | 'inspections' | 'reconditioning' | 'operations' | 'quality-listings' | 'crm' | 'sales' | 'reservations' | 'deals' | 'finance'>('intake')
   const [inspectionVehicle, setInspectionVehicle] = useState<Vehicle | null>(null)
   const [email, setEmail] = useState('admin@volga-auto.demo')
   const [password, setPassword] = useState('DealerOS!2026')
@@ -121,13 +122,14 @@ export default function App() {
         {(session?.permissions?.includes('sales.visits.view') || session?.permissions?.includes('sales.offers.view')) && <button className={view === 'sales' ? 'active' : ''} onClick={() => setView('sales')}>Визиты и Offer</button>}
         {session?.permissions?.includes('reservations.view') && <button className={view === 'reservations' ? 'active' : ''} onClick={() => setView('reservations')}>Брони</button>}
         {session?.permissions?.includes('deals.view') && <button className={view === 'deals' ? 'active' : ''} onClick={() => setView('deals')}>Сделки</button>}
+        {session?.permissions?.includes('finance.view') && <button className={view === 'finance' ? 'active' : ''} onClick={() => setView('finance')}>Экономика</button>}
       </nav>
       <div className="context-pill"><span className="pulse" />{session?.organizationName} · {session?.branchName}</div>
       <button className="link-button" onClick={() => { clearSession(); setView('intake'); setAuthenticated(false); queryClient.clear() }}>Выйти</button>
     </header>
 
     <main className="workspace">
-      {view === 'inspections' ? <InspectionsWorkspace focusVehicle={inspectionVehicle} onClearFocus={() => setInspectionVehicle(null)} /> : view === 'reconditioning' ? <ReconditioningWorkspace /> : view === 'operations' ? <OperationsWorkspace /> : view === 'quality-listings' ? <QualityListingsWorkspace /> : view === 'crm' ? <CrmWorkspace /> : view === 'sales' ? <SalesWorkspace /> : view === 'reservations' ? <ReservationsWorkspace /> : view === 'deals' ? <DealsWorkspace /> : <>
+      {view === 'inspections' ? <InspectionsWorkspace focusVehicle={inspectionVehicle} onClearFocus={() => setInspectionVehicle(null)} /> : view === 'reconditioning' ? <ReconditioningWorkspace /> : view === 'operations' ? <OperationsWorkspace /> : view === 'quality-listings' ? <QualityListingsWorkspace /> : view === 'crm' ? <CrmWorkspace /> : view === 'sales' ? <SalesWorkspace /> : view === 'reservations' ? <ReservationsWorkspace /> : view === 'deals' ? <DealsWorkspace /> : view === 'finance' ? <FinanceWorkspace /> : <>
       <div className="page-heading">
         <div><p className="eyebrow">Склад автомобилей</p><h1>Приём автомобиля</h1><p className="muted">Создайте цифровой паспорт, затем подтвердите фактическую приёмку на площадку.</p></div>
         <div className="metric"><span>На контроле</span><strong>{vehicles.data?.filter((x) => x.status === 'IntakeDraft').length ?? 0}</strong><small>черновиков поступления</small></div>

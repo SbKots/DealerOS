@@ -12,7 +12,8 @@ using DealerOS.SharedKernel;
 namespace DealerOS.Modules.Deals.Application;
 
 public sealed class DealService(IDealStore store, IDealDocumentStorage documentStorage,
-    IDealPdfGenerator pdfGenerator, IAuditWriter audit, TimeProvider timeProvider)
+    IDealPdfGenerator pdfGenerator, IProfitSnapshotWriter profitSnapshots, IAuditWriter audit,
+    TimeProvider timeProvider)
 {
     public async Task<DealResponse> CreateAsync(ActorContext actor, CreateDealRequest request,
         string correlationId, CancellationToken cancellationToken)
@@ -81,11 +82,15 @@ public sealed class DealService(IDealStore store, IDealDocumentStorage documentS
     {
         var deal = await FindAsync(actor, dealId, Permissions.DealsPayments, cancellationToken);
         var now = timeProvider.GetUtcNow();
+        var completedBeforeRefund = deal.Status == DealStatus.Completed && request.Kind == PaymentKind.Refund;
         if (!deal.RegisterPayment(request.PaymentId, request.CommandId, request.Kind, request.Status,
                 request.Amount, request.Currency, request.ManualReference, request.Reason, request.OccurredAt,
                 request.ExpectedVersion, actor.UserId, now)) return Map(deal);
         if (deal.Status == DealStatus.Refunded)
             await ReleaseVehicleAsync(deal, actor.UserId, now, cancellationToken);
+        if (completedBeforeRefund)
+            await profitSnapshots.CaptureAsync(deal, actor.UserId, "Completed deal refund", now,
+                cancellationToken);
         WriteAudit(actor, request.Kind == PaymentKind.Refund ? "deal.refund_registered" : "deal.payment_registered",
             deal, correlationId, now);
         await store.SaveChangesAsync(cancellationToken);
@@ -174,6 +179,7 @@ public sealed class DealService(IDealStore store, IDealDocumentStorage documentS
         if (listing is not null)
             foreach (var publication in listing.Publications.Where(x => x.Status == ChannelPublicationStatus.Published).ToArray())
                 listing.Unpublish(Guid.NewGuid(), publication.Channel, actor.UserId, now);
+        await profitSnapshots.CaptureAsync(deal, actor.UserId, "Deal completed", now, cancellationToken);
         WriteAudit(actor, "deal.completed", deal, correlationId, now);
         await store.SaveChangesAsync(cancellationToken);
         return Map(deal);

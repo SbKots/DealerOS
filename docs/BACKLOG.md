@@ -1,5 +1,16 @@
 # Backlog
 
+## Готово в коде — версия 1.0
+
+- immutable ProfitSnapshot при Completed Deal и новые ревизии после refund/cost correction;
+- воспроизводимая plan/fact формула без двойного учёта payments/discount, mixed-currency blocker и банковское округление;
+- dashboard по branch/currency, убыточные автомобили, source drill-down и permission-checked CSV без PII;
+- correlation ID в response/structured log, health checks и идемпотентный коммерческий demo seed;
+- локальные PostgreSQL + private MinIO backup/restore scripts с isolated tmpfs drill;
+- unit, PostgreSQL+MinIO integration, frontend и Playwright Sold → Profit lifecycle.
+
+DealerOS 1.0 закрывает локальный демонстрационный MVP. Следующая граница — pilot/production hardening, интеграции реального учёта и юридическая проверка; реальные данные пока запрещены.
+
 ## Готово в коде — итерация 0.9
 
 - атомарное преобразование Active Reservation в immutable Deal snapshot и `SaleInProgress`;
@@ -10,7 +21,7 @@
 - атомарный `Vehicle Sold`, финальность повторной продажи и automatic listing unpublish;
 - unit, PostgreSQL+MinIO integration, component и Playwright lifecycle до Sold.
 
-Следующий checkpoint: immutable ProfitSnapshot, plan/fact dashboard, CSV и локальная операционная проверяемость 1.0.
+Следующий checkpoint выполнен в 1.0: immutable ProfitSnapshot, plan/fact dashboard, CSV и локальная операционная проверяемость.
 
 ## Готово в коде — итерация 0.8
 

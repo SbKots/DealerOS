@@ -22,8 +22,10 @@
 - Пароли demo seed хешируются стандартным `PasswordHasher`; реальные среды должны использовать IdP, MFA для privileged users и secret manager.
 - JWT key в `appsettings.json` и Compose только локальный. Production обязан переопределить его секретом, отключить demo seed и использовать TLS.
 - Audit table не имеет API изменения/удаления. Логи не содержат пароль/токен/полный request body.
+- Finance endpoints повторяют permission и branch checks в application/store; CSV не содержит customer name, email, phone, документов или payment contents. Manual costs и ProfitSnapshot append-only; correction создаёт ссылочную ревизию.
+- `X-Correlation-ID` ограничивается безопасным форматом/длиной либо заменяется серверным ID; он не является средством аутентификации и не должен содержать PII.
 - CRM contact values, consent source, merge/close reason и activity summary не копируются в audit payload или application logs. Tenant-aware customer/lead FK, branch predicates и отдельный merge permission защищают PII от межорганизационного и непривилегированного доступа.
 - Dependency restore проверяется NuGet/npm audit в release hardening; известная уязвимая OpenAPI dependency шаблона удалена.
-- До production нужны полноценная rotation/revocation модель с security stamp или централизованным IdP, MFA, CSP, secure headers, malware scanning/CDR для файлов, S3 encryption/lifecycle, backup/restore drill и правовая проверка персональных данных.
+- До production нужны полноценная rotation/revocation модель с security stamp или централизованным IdP, MFA, TLS/CSP/secure headers, secret manager, malware scanning/CDR, S3/DB encryption и lifecycle, off-site backup/restore policy, monitoring/alerting/HA и правовая проверка персональных данных. Реальные данные в 1.0 запрещены.
 
 Сообщения об уязвимостях передавать приватно владельцам репозитория, не создавая публичный issue с эксплойтом или секретами.

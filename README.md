@@ -1,8 +1,8 @@
 # DealerOS
 
-> Текущий сквозной релиз 0.9 продолжает бронь неизменяемой сделкой, append-only платежами/возвратами, private demo PDF и контролируемой выдачей до `Sold`.
+> DealerOS 1.0 — локальный демонстрационный MVP полного пути автомобиля: от поступления до `Sold`, immutable ProfitSnapshot и управленческой plan/fact экономики.
 
-DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.9 закрывает коммерческий lifecycle: Active Reservation → Deal snapshot → оплата → документы → handover → Vehicle Sold и снятие публикации.
+DealerOS — операционная система среднего автосалона автомобилей с пробегом. Release train 0.8–1.0 закрывает коммерческий lifecycle: Approved Offer → конкурентно безопасная Reservation → Deal → оплата/private PDF → handover → Vehicle Sold → проверяемая прибыль и CSV.
 
 ## Быстрый запуск
 
@@ -27,6 +27,8 @@ docker compose up --build
 
 В CRM demo seed содержит клиента Ивана Петрова и назначенный просроченный лид «Кроссовер до 2 млн ₽». Руководитель может проверить очередь SLA, первый контакт и квалификацию; администратор — создание клиента и явное объединение найденных дублей.
 
+Для быстрого показа 1.0 seed также создаёт три независимые точки входа: Approved Offer (`Passat Offer`), Active Reservation (`Passat Reservation`) и Draft Deal (`Passat Deal`). Seed идемпотентен; повторный запуск не создаёт копии.
+
 Остановить окружение: `docker compose down`. Удалить только локальные демонстрационные данные: `docker compose down -v`.
 
 ## Локальная разработка
@@ -48,6 +50,8 @@ API в Development применяет миграции и идемпотентн
 - `Operations__DeadlineWorkerEnabled`, `Operations__DeadlineWorkerIntervalMinutes` — фоновый tenant-aware контроль близких и просроченных сроков работ.
 - `Reservations__ExpirationWorkerEnabled`, `Reservations__ExpirationWorkerIntervalSeconds` — идемпотентное освобождение истёкших броней.
 
+API принимает необязательный `X-Correlation-ID`, возвращает его в каждом response и включает в structured request log. Если header не задан, ID генерируется сервером.
+
 Диагностика: `/health/live` проверяет процесс, `/health/ready` — PostgreSQL и object storage, `/health` сохранён как совмещённая проверка.
 
 ## Проверки
@@ -67,11 +71,28 @@ npm run build
 
 Integration tests используют настоящий PostgreSQL в Testcontainers и требуют запущенный Docker. E2E запускается против полного Compose-стека: `npm run test:e2e` после `docker compose up --build -d`.
 
+## Демонстрация 0.1–1.0
+
+Точный сценарий ролей и экранов приведён в [docs/DEMO.md](docs/DEMO.md). Короткий завершающий путь: `admin@volga-auto.demo` открывает «Брони» → преобразует Approved Offer, затем «Сделки» → фиксирует оплату, формирует оба PDF, завершает handover и открывает «Экономика» → выбирает проданный автомобиль и проверяет source drill-down/ревизию/CSV. Полный путь от intake, осмотра, подготовки, QC, CRM и визита автоматизирован в Playwright.
+
+## Локальный backup/restore drill
+
+При запущенном Compose и после создания хотя бы одного private файла:
+
+```powershell
+$backup = .\scripts\backup-local.ps1
+.\scripts\restore-verify.ps1 -BackupPath $backup
+```
+
+Backup сохраняется в ignored `.local-backups/`. Restore verification поднимает только случайно именованные временные контейнеры PostgreSQL/MinIO с `tmpfs`, проверяет manifest SHA-256, migrations, ключевые counts, read-only vehicle query и hash одного private object, затем удаляет только эти временные контейнеры. Постоянные Compose volumes не подключаются и не изменяются.
+
+DealerOS 1.0 предназначен только для локальной демонстрации с синтетическими данными. Реальные персональные/финансовые данные и production deployment запрещены до внедрения production IdP/MFA, TLS, secret manager, encryption/retention, malware scanning, HA/monitoring и правовой проверки.
+
 ## Структура
 
 - `apps/api` — composition root, HTTP API, EF Core, JWT, миграции и адаптеры;
 - `apps/web` — React/TypeScript интерфейс и Playwright e2e;
-- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles, Inspections, Reconditioning, Operations, CRM и Sales;
+- `modules` — границы SharedKernel, IdentityAccess, Organizations, Vehicles, Inspections, Reconditioning, Operations, CRM, Sales, Reservations, Deals и Finance;
 - `tests` — backend unit и PostgreSQL integration tests;
 - `docs` — продукт, архитектура, решения, безопасность, demo и backlog;
 - `compose.yaml` — воспроизводимое локальное окружение;

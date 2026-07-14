@@ -156,9 +156,12 @@ public sealed class Deal
             throw new DomainException("deal.payment_time_invalid", "Время платежа находится вне допустимого диапазона.");
         if (kind == PaymentKind.Deposit)
             throw new DomainException("deal.deposit_transfer_only", "Deposit переносится только из брони.");
+        var closesCancelledDeal = false;
         if (kind == PaymentKind.Refund)
         {
-            EnsureStatus(DealStatus.RefundPending);
+            if (Status is not (DealStatus.RefundPending or DealStatus.Completed))
+                throw new DomainException("deal.status_conflict", $"Возврат недоступен в статусе {Status}.");
+            closesCancelledDeal = Status == DealStatus.RefundPending;
             if (status != PaymentStatus.Refunded)
                 throw new DomainException("deal.refund_status_invalid", "Завершённый возврат должен иметь статус Refunded.");
             if (safeAmount > NetPaid)
@@ -174,7 +177,7 @@ public sealed class Deal
         }
         _payments.Add(new DealPayment(paymentId, OrganizationId, Id, commandId, kind, status, safeAmount,
             safeCurrency, reference, normalizedReason, actorUserId, occurredAt, now));
-        if (kind == PaymentKind.Refund && NetPaid == 0)
+        if (kind == PaymentKind.Refund && NetPaid == 0 && closesCancelledDeal)
         {
             Status = DealStatus.Refunded; ClosedAt = now;
         }

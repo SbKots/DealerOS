@@ -60,6 +60,16 @@ public static class Permissions
     public const string DealsDocuments = "deals.documents";
     public const string DealsHandover = "deals.handover";
     public const string DealsCancel = "deals.cancel";
+    public const string FinanceView = "finance.view";
+    public const string FinanceEditCosts = "finance.edit_costs";
+    public const string FinanceExport = "finance.export";
+
+    public static readonly string[] FinanceOperator =
+    [
+        FinanceView,
+        FinanceEditCosts,
+        FinanceExport
+    ];
 
     public static readonly string[] DealOperator =
     [
@@ -95,7 +105,8 @@ public static class Permissions
         SalesOffersAutoApprove,
         SalesOffersCancel,
         .. ReservationOperator,
-        .. DealOperator
+        .. DealOperator,
+        .. FinanceOperator
     ];
 
     public static readonly string[] SalesManager =
@@ -104,7 +115,9 @@ public static class Permissions
         SalesOffersView,
         SalesOffersApprove,
         ReservationsView,
-        DealsView
+        DealsView,
+        FinanceView,
+        FinanceExport
     ];
 
     public static readonly string[] CrmOperator =

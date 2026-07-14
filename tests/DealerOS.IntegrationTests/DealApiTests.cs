@@ -177,6 +177,103 @@ public sealed class DealApiTests(ReconditioningPostgresFixture database)
             db.ChannelPublications.Where(x => x.ListingContentId == source.ListingId).Select(x => x.Status).SingleAsync()));
         Assert.Equal(2, await factory.QueryDbAsync(db => db.DealPayments.CountAsync(x => x.DealId == dealId)));
         Assert.Equal(2, await factory.QueryDbAsync(db => db.DealDocuments.CountAsync(x => x.DealId == dealId)));
+
+        var completed = await ReadJsonAsync(completes.Single(x => x.StatusCode == HttpStatusCode.OK));
+        var initialSnapshot = await factory.QueryDbAsync(db => db.ProfitSnapshots.SingleAsync(x =>
+            x.DealId == dealId));
+        Assert.Equal(1, initialSnapshot.Revision);
+        Assert.Equal(1_500_000m, initialSnapshot.GrossRevenue);
+        Assert.Equal(1_100_000m, initialSnapshot.PurchaseCost);
+        Assert.Equal(400_000m, initialSnapshot.ActualProfit);
+
+        var costId = Guid.NewGuid(); var costCommandId = Guid.NewGuid(); var costOccurredAt = DateTimeOffset.UtcNow;
+        var costRequest = new
+        {
+            costEntryId = costId,
+            commandId = costCommandId,
+            category = "Advertising",
+            source = "Demo marketplace",
+            reference = $"ADV-{dealId:N}",
+            amount = 15_000m,
+            currency = "RUB",
+            occurredAt = costOccurredAt,
+            evidence = "demo://invoice/advertising",
+            comment = "Размещение объявления"
+        };
+        using var costCreated = await first.PostAsJsonAsync($"/api/finance/deals/{dealId}/costs", costRequest);
+        costCreated.EnsureSuccessStatusCode();
+        using var costReplay = await first.PostAsJsonAsync($"/api/finance/deals/{dealId}/costs", costRequest);
+        costReplay.EnsureSuccessStatusCode();
+        Assert.Equal(costId, (await ReadJsonAsync(costReplay)).GetProperty("id").GetGuid());
+
+        using var correctedResponse = await first.PostAsJsonAsync($"/api/finance/costs/{costId}/corrections", new
+        {
+            costEntryId = Guid.NewGuid(),
+            commandId = Guid.NewGuid(),
+            category = "Advertising",
+            source = "Demo marketplace",
+            reference = $"ADV-CORRECTED-{dealId:N}",
+            amount = 20_000m,
+            currency = "RUB",
+            occurredAt = costOccurredAt,
+            evidence = "demo://invoice/advertising-corrected",
+            comment = "Исправленная сумма",
+            correctionReason = "Получен итоговый акт"
+        });
+        correctedResponse.EnsureSuccessStatusCode();
+
+        deal = await PostAndReadAsync(first, $"/api/deals/{dealId}/payments", new
+        {
+            paymentId = Guid.NewGuid(),
+            commandId = Guid.NewGuid(),
+            kind = "Refund",
+            status = "Refunded",
+            amount = 50_000m,
+            currency = "RUB",
+            manualReference = $"DEMO-POSTSALE-REFUND-{dealId:N}",
+            reason = "Компенсация после выдачи",
+            occurredAt = DateTimeOffset.UtcNow,
+            expectedVersion = completed.GetProperty("version").GetInt64()
+        });
+        Assert.Equal("Completed", deal.GetProperty("status").GetString());
+        var snapshots = await factory.QueryDbAsync(db => db.ProfitSnapshots.Where(x => x.DealId == dealId)
+            .OrderBy(x => x.Revision).ToListAsync());
+        Assert.Equal(4, snapshots.Count);
+        Assert.Equal(initialSnapshot.Id, snapshots[1].RevisesSnapshotId);
+        Assert.Equal(330_000m, snapshots[^1].ActualProfit);
+        Assert.Equal(50_000m, snapshots[^1].Refunds);
+        Assert.Equal(20_000m, snapshots[^1].ManualCost);
+
+        using var economics = await first.GetAsync($"/api/finance/vehicles/{source.VehicleId}");
+        economics.EnsureSuccessStatusCode();
+        var economicsJson = await ReadJsonAsync(economics);
+        Assert.Equal(4, economicsJson.GetProperty("revisions").GetArrayLength());
+        Assert.Equal(snapshots[^1].Sha256, economicsJson.GetProperty("latest").GetProperty("sha256").GetString());
+
+        const string correlationId = "finance-integration-correlation-001";
+        using var dashboardRequest = new HttpRequestMessage(HttpMethod.Get, "/api/finance/dashboard");
+        dashboardRequest.Headers.Add("X-Correlation-ID", correlationId);
+        using var dashboardResponse = await first.SendAsync(dashboardRequest);
+        dashboardResponse.EnsureSuccessStatusCode();
+        Assert.Equal(correlationId, dashboardResponse.Headers.GetValues("X-Correlation-ID").Single());
+        var dashboard = await ReadJsonAsync(dashboardResponse);
+        var group = Assert.Single(dashboard.GetProperty("groups").EnumerateArray());
+        Assert.Equal(330_000m, group.GetProperty("actualProfit").GetDecimal());
+        Assert.Equal(1_120_000m, group.GetProperty("totalCost").GetDecimal());
+
+        using var csvResponse = await first.GetAsync("/api/finance/export.csv");
+        csvResponse.EnsureSuccessStatusCode();
+        Assert.Equal("text/csv", csvResponse.Content.Headers.ContentType?.MediaType);
+        var csv = await csvResponse.Content.ReadAsStringAsync();
+        Assert.Contains(source.VehicleId.ToString(), csv);
+        Assert.DoesNotContain("Покупатель Deal", csv);
+        Assert.DoesNotContain("@demo.local", csv);
+        using var viewer = factory.CreateClient(); await AuthenticateAsync(viewer, "viewer@volga-auto.demo");
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync("/api/finance/export.csv")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await north.GetAsync($"/api/finance/vehicles/{source.VehicleId}")).StatusCode);
+        Assert.True(await factory.QueryDbAsync(db => db.AuditEvents.CountAsync(x =>
+            x.OrganizationId == DemoSeed.VolgaOrganizationId && x.Operation.StartsWith("finance."))) >= 3);
     }
 
     [Fact]

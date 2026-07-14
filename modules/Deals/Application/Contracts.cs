@@ -68,3 +68,9 @@ public interface IDealPdfGenerator
 {
     byte[] Generate(DealPdfModel model);
 }
+
+public interface IProfitSnapshotWriter
+{
+    Task CaptureAsync(Deal deal, Guid actorUserId, string reason, DateTimeOffset now,
+        CancellationToken cancellationToken);
+}

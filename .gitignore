@@ -16,3 +16,4 @@
 *.suo
 *.pfx
 *.key
+.local-backups/
