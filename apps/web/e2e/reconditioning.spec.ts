@@ -10,6 +10,7 @@ test('employee plans reconditioning, manager approves budget, and a new revision
 
   await page.goto('/')
   await login(page, 'admin@volga-auto.demo')
+  await page.getByRole('navigation', { name: 'Разделы' }).getByRole('button', { name: 'Приёмка' }).click()
   await page.getByLabel('Филиал').selectOption({ index: 1 })
   await page.getByLabel('VIN').fill(vin)
   await page.getByLabel('Марка').fill('Volkswagen')
