@@ -45,9 +45,15 @@ h3 { color: var(--ink); font-size: 16px; letter-spacing: -.015em; }
 
 .app-logo { display: flex; align-items: center; gap: 11px; min-width: 0; color: var(--ink); }
 .app-logo.inverse { color: #fff; }
-.logo-symbol { position: relative; width: 38px; height: 38px; display: grid; flex: 0 0 38px; place-items: center; overflow: hidden; border-radius: 11px; color: var(--green-deep); background: var(--lime); box-shadow: inset 0 -7px 14px rgba(37, 77, 52, .12); }
-.logo-symbol::after { position: absolute; right: -7px; bottom: -8px; width: 24px; height: 24px; border: 1px solid rgba(13, 53, 40, .25); border-radius: 50%; content: ""; }
-.logo-symbol span { position: relative; z-index: 1; font-size: 17px; font-weight: 900; }
+.logo-symbol { width: 48px; height: 40px; display: grid; flex: 0 0 48px; place-items: center; }
+.logo-symbol svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 7px rgba(8, 40, 29, .12)); }
+.logo-symbol-tile { fill: #fbfaf4; stroke: rgba(13, 53, 40, .14); stroke-width: 2; }
+.logo-symbol-car { fill: #0b4a34; }
+.logo-symbol-lime { fill: #91c414; }
+.logo-symbol-lime-line { fill: none; stroke: #91c414; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+.logo-symbol-graphite { fill: #3f4140; }
+.logo-symbol-graphite-line { fill: none; stroke: #3f4140; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+.logo-symbol-cutout { fill: #fbfaf4; }
 .logo-copy { display: grid; min-width: 0; gap: 2px; }
 .logo-copy strong { font-size: 17px; letter-spacing: -.035em; }
 .logo-copy small { overflow: hidden; color: #8da299; font-size: 8px; font-weight: 650; letter-spacing: .08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
@@ -118,8 +124,8 @@ h3 { color: var(--ink); font-size: 16px; letter-spacing: -.015em; }
 .mobile-menu-backdrop { display: none; }
 .sidebar-compact .sidebar { width: 88px; }
 .sidebar-compact .app-main { margin-left: 88px; }
-.sidebar-compact .sidebar-brand { justify-content: center; padding: 0 15px; }
-.sidebar-compact .sidebar-brand .sidebar-collapse { position: absolute; right: -13px; background: var(--green-dark); }
+.sidebar-compact .sidebar-brand { justify-content: flex-start; padding: 0 8px; }
+.sidebar-compact .sidebar-brand .sidebar-collapse { position: absolute; right: 5px; width: 22px; margin-left: 0; background: rgba(255,255,255,.04); }
 .sidebar-compact .sidebar-collapse .icon { transform: rotate(180deg); }
 .sidebar-compact .main-nav { padding-inline: 13px; }
 .sidebar-compact .nav-group-label, .sidebar-compact .main-nav button > span, .sidebar-compact .main-nav button.active > i, .sidebar-compact .sidebar-footer { display: none; }
