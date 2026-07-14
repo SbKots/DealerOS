@@ -1,5 +1,39 @@
 # Backlog
 
+## Готово в коде — версия 1.0
+
+- immutable ProfitSnapshot при Completed Deal и новые ревизии после refund/cost correction;
+- воспроизводимая plan/fact формула без двойного учёта payments/discount, mixed-currency blocker и банковское округление;
+- dashboard по branch/currency, убыточные автомобили, source drill-down и permission-checked CSV без PII;
+- correlation ID в response/structured log, health checks и идемпотентный коммерческий demo seed;
+- локальные PostgreSQL + private MinIO backup/restore scripts с isolated tmpfs drill;
+- unit, PostgreSQL+MinIO integration, frontend и Playwright Sold → Profit lifecycle.
+
+DealerOS 1.0 закрывает локальный демонстрационный MVP. Следующая граница — pilot/production hardening, интеграции реального учёта и юридическая проверка; реальные данные пока запрещены.
+
+## Готово в коде — итерация 0.9
+
+- атомарное преобразование Active Reservation в immutable Deal snapshot и `SaleInProgress`;
+- append-only Deposit/Payment/Refund/Adjustment с idempotency, currency и reconciliation;
+- два настоящих private PDF, SHA-256, template revision, download permission и audit;
+- `AwaitingPayment → ReadyForHandover → Completed`, обязательный checklist и server blockers;
+- отмена без денег либо `RefundPending → Refunded` с освобождением автомобиля;
+- атомарный `Vehicle Sold`, финальность повторной продажи и automatic listing unpublish;
+- unit, PostgreSQL+MinIO integration, component и Playwright lifecycle до Sold.
+
+Следующий checkpoint выполнен в 1.0: immutable ProfitSnapshot, plan/fact dashboard, CSV и локальная операционная проверяемость.
+
+## Готово в коде — итерация 0.8
+
+- бронь только из действующего актуального Approved Offer snapshot;
+- явные `PendingDeposit/Active/Expired/Cancelled/DepositFailed/ConvertedToDeal` и статусы предоплаты;
+- атомарный `ReadyForSale → Reserved`, partial unique index и PostgreSQL race двух клиентов;
+- отдельные idempotent команды deposit/extend/cancel/expire, optimistic concurrency и audit;
+- tenant/branch/permission isolation, application expiration worker, очередь и таймер во frontend;
+- unit, PostgreSQL integration, component и сквозной Playwright сценарии.
+
+Следующий checkpoint: Deal snapshot, immutable Payment ledger, private demo PDFs, возврат и выдача автомобиля.
+
 ## Готово в коде — итерация 0.7
 
 - календарь визитов, reschedule/arrival/result и безопасный test-drive check-out/check-in;
@@ -64,9 +98,7 @@
 
 ## Следующая продуктовая граница
 
-1. Временная бронь с конкурентной защитой и истечением.
-2. Deal snapshot, оплата, договоры и выдача.
-3. Итоговая экономика plan/fact по завершённой продаже.
+1. Итоговая экономика plan/fact по завершённой продаже.
 
 ## Позже по MVP
 

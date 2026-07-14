@@ -1,5 +1,9 @@
 # Security baseline
 
+- Deal totals вычисляются из immutable Approved Offer snapshot; клиент не задаёт tenant, branch, customer, vehicle или финансовый total. Payment/Refund не содержит карты или банковских реквизитов, использует только безопасный manual reference и не копируется целиком в audit/logs. PDF хранится в private MinIO, скачивается через JWT+permission API и помечен как demo/non-legal; SHA-256 и template revision позволяют проверить неизменность.
+
+- Reservation не принимает tenant/branch/customer/vehicle из доверенного client context: они выводятся из exact Approved Offer snapshot. Активную бронь атомарно защищает tenant-aware partial unique index; race loser получает контролируемый 409. Manual deposit хранит только безопасную ссылку без карты/банковских реквизитов. Expiration worker освобождает Vehicle транзакционно и не может снять конкурентно преобразованную бронь.
+
 - Sales API не принимает tenant из запроса и повторно проверяет branch, Customer, Qualified Lead, Vehicle, Listing, execution и ответственного сотрудника. Composite tenant FK не позволяют связать записи разных организаций прямой записью в БД.
 - Для test drive хранится только boolean подтверждения проверки водительских документов. Сканы и полный номер документа отсутствуют в HTTP-контрактах, домене, БД, audit и логах.
 - Offer принимает только положительные прозрачные строки и неотрицательную скидку; итог, себестоимость и маржа рассчитываются сервером. Утверждённый snapshot неизменяем, self-approval запрещён, решения защищены ID и optimistic concurrency.
@@ -18,8 +22,10 @@
 - Пароли demo seed хешируются стандартным `PasswordHasher`; реальные среды должны использовать IdP, MFA для privileged users и secret manager.
 - JWT key в `appsettings.json` и Compose только локальный. Production обязан переопределить его секретом, отключить demo seed и использовать TLS.
 - Audit table не имеет API изменения/удаления. Логи не содержат пароль/токен/полный request body.
+- Finance endpoints повторяют permission и branch checks в application/store; CSV не содержит customer name, email, phone, документов или payment contents. Manual costs и ProfitSnapshot append-only; correction создаёт ссылочную ревизию.
+- `X-Correlation-ID` ограничивается безопасным форматом/длиной либо заменяется серверным ID; он не является средством аутентификации и не должен содержать PII.
 - CRM contact values, consent source, merge/close reason и activity summary не копируются в audit payload или application logs. Tenant-aware customer/lead FK, branch predicates и отдельный merge permission защищают PII от межорганизационного и непривилегированного доступа.
 - Dependency restore проверяется NuGet/npm audit в release hardening; известная уязвимая OpenAPI dependency шаблона удалена.
-- До production нужны полноценная rotation/revocation модель с security stamp или централизованным IdP, MFA, CSP, secure headers, malware scanning/CDR для файлов, S3 encryption/lifecycle, backup/restore drill и правовая проверка персональных данных.
+- До production нужны полноценная rotation/revocation модель с security stamp или централизованным IdP, MFA, TLS/CSP/secure headers, secret manager, malware scanning/CDR, S3/DB encryption и lifecycle, off-site backup/restore policy, monitoring/alerting/HA и правовая проверка персональных данных. Реальные данные в 1.0 запрещены.
 
 Сообщения об уязвимостях передавать приватно владельцам репозитория, не создавая публичный issue с эксплойтом или секретами.

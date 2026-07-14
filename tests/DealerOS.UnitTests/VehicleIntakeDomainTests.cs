@@ -80,6 +80,24 @@ public sealed class VehicleIntakeDomainTests
     }
 
     [Fact]
+    public void ReservationAndSaleStatusesHaveControlledTransitions()
+    {
+        var actor = Guid.NewGuid();
+        var vehicle = Vehicle.CreateDraft(Guid.NewGuid(), Guid.NewGuid(), "WVWZZZ1JZXW000001", "Volkswagen",
+            "Passat", 2021, 52_000, new Money(1_850_000m, "RUB"), Now, actor);
+        vehicle.AcceptToStock("msk", Now.AddMinutes(1), actor);
+        vehicle.BeginInspection(Now.AddMinutes(2), actor);
+        vehicle.CompleteInspection(true, Now.AddMinutes(3), actor);
+        vehicle.MarkReadyForSale(Now.AddMinutes(4), actor);
+        vehicle.Reserve(Now.AddMinutes(5), actor);
+        Assert.Equal(VehicleStatus.Reserved, vehicle.Status);
+        vehicle.BeginSale(Now.AddMinutes(6), actor);
+        vehicle.CompleteSale(Now.AddMinutes(7), actor);
+        Assert.Equal(VehicleStatus.Sold, vehicle.Status);
+        Assert.Throws<DomainException>(() => vehicle.Reserve(Now.AddMinutes(8), actor));
+    }
+
+    [Fact]
     public void AcceptToStock_CannotBeRepeated()
     {
         var vehicle = Vehicle.CreateDraft(Guid.NewGuid(), Guid.NewGuid(), "WVWZZZ1JZXW000001", "Volkswagen", "Passat",

@@ -165,3 +165,26 @@ table { width: 100%; border-collapse: collapse; font-size: 12px; } th { padding:
 @media (max-width: 900px) { .sales-form, .economics { grid-template-columns: repeat(2, 1fr); }.economics > div:nth-child(3n) { border-right: 1px solid #d6e3da; }.economics > div:nth-child(2n) { border-right: 0; } }
 @media (max-width: 700px) { .offer-line-row { grid-template-columns: 1fr; } }
 @media (max-width: 580px) { .sales-form, .economics { grid-template-columns: 1fr; }.calendar-list > button, .offer-list > button { grid-template-columns: 1fr; }.economics > div { border-right: 0; } }
+
+.reservation-layout { display: grid; grid-template-columns: minmax(360px, .8fr) minmax(520px, 1.2fr); gap: 20px; align-items: start; }
+.reservation-form { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: #f8faf8; }
+.reservation-form .check-row { display: flex; align-items: center; gap: 8px; }.reservation-form .check-row input { width: auto; }
+.reservation-list { display: grid; gap: 8px; }.reservation-list > button { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 14px; padding: 13px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: white; text-align: left; }.reservation-list > button:hover { border-color: var(--green); background: #f5faf7; }.reservation-list span:first-child { display: grid; gap: 3px; }.reservation-list small { color: var(--muted); font-size: 9px; }
+.reservation-card { display: grid; gap: 14px; }.countdown { color: var(--green); white-space: nowrap; }.countdown.urgent { color: #a33e37; }.countdown.closed { color: var(--muted); }
+@media (max-width: 1050px) { .reservation-layout { grid-template-columns: 1fr; } }
+@media (max-width: 580px) { .reservation-form { grid-template-columns: 1fr; }.reservation-list > button { grid-template-columns: 1fr; } }
+
+.deal-layout { display: grid; gap: 20px; }.deal-create { grid-template-columns: minmax(260px, 1fr) auto; border: 1px solid var(--line); border-radius: 8px; background: #f8faf8; }.deal-list { display: grid; gap: 8px; margin-top: 15px; }.deal-list > button { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 16px; padding: 13px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: white; text-align: left; }.deal-list span:first-child { display: grid; gap: 3px; }.deal-list small { color: var(--muted); font-size: 9px; }
+.deal-workspace { display: grid; gap: 16px; }.deal-sections { display: grid; gap: 14px; }.document-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }.document-grid article { display: grid; gap: 7px; padding: 13px; border: 1px solid var(--line); border-radius: 7px; background: #f7faf8; }.document-grid small { color: var(--muted); }
+.payment-timeline { display: grid; gap: 8px; }.payment-timeline article { display: grid; grid-template-columns: 120px 1fr auto; gap: 4px 14px; padding: 11px; border-left: 3px solid var(--green); background: #f7faf8; }.payment-timeline span, .payment-timeline small { color: var(--muted); font-size: 9px; }.payment-timeline small { grid-column: 2 / -1; }
+@media (max-width: 700px) { .deal-create, .document-grid { grid-template-columns: 1fr; }.deal-list > button { grid-template-columns: 1fr; }.payment-timeline article { grid-template-columns: 1fr; }.payment-timeline small { grid-column: auto; } }
+
+.finance-filters { display: flex; gap: 16px; align-items: end; margin-bottom: 20px; flex-wrap: wrap; }
+.finance-filters label { min-width: 170px; }
+.finance-group, .finance-detail { margin-top: 20px; }
+.finance-metrics { grid-template-columns: repeat(6, minmax(130px, 1fr)); }
+.negative-value { color: #b42318 !important; }
+.source-grid { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 12px; margin: 20px 0; }
+.source-grid article { background: #f7faf8; border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 5px; }
+.source-grid span, .source-grid small { color: var(--muted); }
+@media (max-width: 1100px) { .finance-metrics, .source-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); } }

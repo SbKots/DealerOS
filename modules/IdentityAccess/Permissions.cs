@@ -47,6 +47,50 @@ public static class Permissions
     public const string SalesOffersAutoApprove = "sales.offers.auto_approve";
     public const string SalesOffersApprove = "sales.offers.approve";
     public const string SalesOffersCancel = "sales.offers.cancel";
+    public const string ReservationsView = "reservations.view";
+    public const string ReservationsCreate = "reservations.create";
+    public const string ReservationsEdit = "reservations.edit";
+    public const string ReservationsExtend = "reservations.extend";
+    public const string ReservationsCancel = "reservations.cancel";
+    public const string ReservationsDeposit = "reservations.deposit";
+    public const string DealsView = "deals.view";
+    public const string DealsCreate = "deals.create";
+    public const string DealsEdit = "deals.edit";
+    public const string DealsPayments = "deals.payments";
+    public const string DealsDocuments = "deals.documents";
+    public const string DealsHandover = "deals.handover";
+    public const string DealsCancel = "deals.cancel";
+    public const string FinanceView = "finance.view";
+    public const string FinanceEditCosts = "finance.edit_costs";
+    public const string FinanceExport = "finance.export";
+
+    public static readonly string[] FinanceOperator =
+    [
+        FinanceView,
+        FinanceEditCosts,
+        FinanceExport
+    ];
+
+    public static readonly string[] DealOperator =
+    [
+        DealsView,
+        DealsCreate,
+        DealsEdit,
+        DealsPayments,
+        DealsDocuments,
+        DealsHandover,
+        DealsCancel
+    ];
+
+    public static readonly string[] ReservationOperator =
+    [
+        ReservationsView,
+        ReservationsCreate,
+        ReservationsEdit,
+        ReservationsExtend,
+        ReservationsCancel,
+        ReservationsDeposit
+    ];
 
     public static readonly string[] SalesOperator =
     [
@@ -59,14 +103,21 @@ public static class Permissions
         SalesOffersEdit,
         SalesOffersSubmit,
         SalesOffersAutoApprove,
-        SalesOffersCancel
+        SalesOffersCancel,
+        .. ReservationOperator,
+        .. DealOperator,
+        .. FinanceOperator
     ];
 
     public static readonly string[] SalesManager =
     [
         SalesVisitsView,
         SalesOffersView,
-        SalesOffersApprove
+        SalesOffersApprove,
+        ReservationsView,
+        DealsView,
+        FinanceView,
+        FinanceExport
     ];
 
     public static readonly string[] CrmOperator =

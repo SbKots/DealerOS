@@ -1,5 +1,27 @@
 # Архитектура
 
+## Дополнение 1.0: Finance и ProfitSnapshot
+
+Модуль `Finance` не создаёт параллельную бухгалтерию. Он читает authoritative purchase из `Vehicle`, completed total/approved snapshot и refunds из `Deal`, фактическую подготовку из `Operations`, а также append-only manual costs только для непредставленных категорий. При `Deal.Completed`, последующем refund или cost correction в той же PostgreSQL-транзакции создаётся новая immutable ревизия `ProfitSnapshot`; предыдущая запись не изменяется.
+
+Формула `DealerOS.Profit.v1`: `GrossRevenue = Deal.FinalTotal`; `NetRevenue = GrossRevenue - completed Refunds`; `TotalCost = Vehicle purchase + completed Operations actuals + active manual costs`; `ActualProfit = NetRevenue - TotalCost`; margin вычисляется только при положительной net revenue банковским округлением. Payment ledger служит reconciliation и не прибавляется к revenue; discount уже включён в Deal total. Все источники snapshot перечислены в JSON, hash SHA-256 защищает повторный идентичный расчёт. Mixed currency блокируется без FX, dashboard группирует показатели по currency.
+
+Tenant-aware FK связывают snapshot/cost с Organization, Branch, Vehicle, Deal и actor. Уникальные `(OrganizationId, DealId, Revision)`, command ID и correction link защищают ревизии и идемпотентность. CSV строится server-side с branch scope, отдельным permission и без customer PII.
+
+## Дополнение 0.9: Deals, Payment ledger и private PDF
+
+Модуль `Deals` владеет Deal snapshot, append-only Payment/Refund, versioned Document metadata и immutable Handover snapshot. Создание Deal атомарно преобразует `Active Reservation → ConvertedToDeal` и `Vehicle Reserved → SaleInProgress`; завершение одной транзакцией делает Deal `Completed`, Vehicle `Sold` и переводит опубликованные каналы Listing в `Unpublished`. Partial unique constraints и optimistic concurrency исключают две активные/завершённые сделки и два результата конкурентного Complete/Cancel.
+
+Итог сделки копируется только из exact `ApprovedOfferSnapshot`; frontend не присылает total. Deposit переносится из Reservation в Payment ledger одной ссылочной записью и не считается выручкой второй раз. Полученные платежи и возвраты остаются неизменяемыми строками с tenant-wide command/manual-reference uniqueness; отмена с деньгами удерживает Vehicle в `SaleInProgress` до полного `Refunded`.
+
+Документы генерируются PDFsharp 6.2.4 (MIT, cross-platform .NET 10), содержат явную demo/non-legal маркировку и snapshot сделки. Бинарный PDF хранится в private MinIO, metadata содержит template version, revision link, SHA-256 и actor/time; скачивание идёт только через permission-checked API и отдельно аудируется. Linux image устанавливает DejaVu Sans для Unicode PDF.
+
+## Дополнение 0.8: Reservations
+
+Модуль `Reservations` продолжает точный `ApprovedOfferSnapshot`, не копируя владение Offer из `Sales`. Создание брони и переход Vehicle `ReadyForSale → Reserved` сохраняются одной транзакцией. Partial unique index `(OrganizationId, VehicleId) WHERE Status IN (PendingDeposit, Active)` является окончательной защитой от двух клиентов; optimistic token обеспечивает согласованность extend/deposit/cancel/expire. Повтор create/command ID с тем же actor и payload идемпотентен, другой payload возвращает `409`.
+
+Expiration worker использует существующий application-worker pattern и `TimeProvider`: он tenant-aware выбирает только просроченные активные брони, идемпотентно закрывает их и освобождает Vehicle только в той же транзакции. `Reserved` блокирует новые Visit/TestDrive/Offer, потому что Sales принимает только `ReadyForSale`. Предоплата 0.8 является явно ручным demo-фактом; неизменяемый Payment ledger принадлежит checkpoint 0.9.
+
 ## Дополнение 0.7: Sales
 
 Модуль `Sales` владеет агрегатами `Visit` и `SalesOffer`, их историями, решениями и `ApprovedOfferSnapshot`. Application service читает проверенные проекции CRM, Vehicle, Listing и Operations через порт, но изменяет только таблицы схемы `sales`. PostgreSQL composite FK сохраняют tenant integrity, optimistic tokens защищают команды, а GiST exclusion constraints атомарно запрещают пересечение активных слотов менеджера и test-drive автомобиля. Публичная цена и подтверждённая себестоимость копируются в Offer как финансовый snapshot; последующие изменения источников не переписывают утверждённое предложение.
@@ -25,6 +47,10 @@ React/Vite -> ASP.NET Core command endpoints -> application services -> aggregat
 - `Reconditioning`: агрегат плана, работы, исключения обязательных дефектов, решения, бюджетные snapshots и ревизии.
 - `Operations`: исполнение утверждённого snapshot, заказ-работы, материалы, фактические расходы, перерасход, сроки и состояние расчёта с подрядчиком.
 - `CRM`: клиент, согласия и дедупликация; лид, назначение, SLA первого ответа, activity timeline и явные lifecycle-команды.
+- `Sales`: Visit, SalesOffer и ApprovedOfferSnapshot; серверные суммы, approval и неизменяемый коммерческий snapshot.
+- `Reservations`: временная бронь Approved Offer, ручной статус предоплаты, истечение и конкурентная блокировка Vehicle.
+- `Deals`: Deal snapshot, immutable payment/refund ledger, private document revisions и handover gate.
+- `Finance`: immutable plan/fact profit revisions, non-duplicated manual costs, dashboard/drill-down и CSV.
 - `SharedKernel`: только стабильные малые понятия и типы ошибок.
 - `apps/api/Infrastructure`: EF mappings по схемам `identity`, `organizations`, `vehicles`, `audit`; это адаптер, а не место бизнес-правил.
 

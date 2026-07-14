@@ -1,7 +1,11 @@
+using System.Text.Json;
 using DealerOS.Modules.Crm.Domain;
+using DealerOS.Modules.Deals.Domain;
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Domain;
 using DealerOS.Modules.Organizations;
+using DealerOS.Modules.Reservations.Domain;
+using DealerOS.Modules.Sales.Domain;
 using DealerOS.Modules.Vehicles.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -138,6 +142,59 @@ public static class DemoSeed
                 createdAt.AddMinutes(1));
             db.Leads.Add(lead);
             await db.SaveChangesAsync(cancellationToken);
+        }
+        await EnsureCommercialDemoAsync(db, demoCustomer, cancellationToken);
+    }
+
+    private static async Task EnsureCommercialDemoAsync(DealerOsDbContext db, Customer customer,
+        CancellationToken cancellationToken)
+    {
+        var rows = new[]
+        {
+            (Vin: "WVWZZZ1JZXW700001", Model: "Passat Offer", Stage: 0),
+            (Vin: "WVWZZZ1JZXW700002", Model: "Passat Reservation", Stage: 1),
+            (Vin: "WVWZZZ1JZXW700003", Model: "Passat Deal", Stage: 2)
+        };
+        for (var index = 0; index < rows.Length; index++)
+        {
+            var row = rows[index];
+            if (await db.Vehicles.AnyAsync(x => x.OrganizationId == VolgaOrganizationId && x.Vin == row.Vin,
+                    cancellationToken)) continue;
+            var now = DateTimeOffset.UtcNow.AddMinutes(-20 + index);
+            var vehicle = Vehicle.CreateDraft(VolgaOrganizationId, VolgaBranchId, row.Vin, "Volkswagen",
+                row.Model, 2023, 28_000 + index * 100, new DealerOS.SharedKernel.Money(1_100_000m, "RUB"),
+                now, VolgaAdminUserId);
+            vehicle.AcceptToStock("MSK", now.AddMinutes(1), VolgaAdminUserId);
+            vehicle.BeginInspection(now.AddMinutes(2), VolgaAdminUserId);
+            vehicle.CompleteInspection(true, now.AddMinutes(3), VolgaAdminUserId);
+            vehicle.MarkReadyForSale(now.AddMinutes(4), VolgaAdminUserId);
+            var lead = Lead.Create(VolgaOrganizationId, VolgaBranchId, customer.Id, vehicle.Id, null,
+                "DealerOS 1.0 demo seed", VolgaAdminUserId, 30, now);
+            var offer = SalesOffer.Create(Guid.NewGuid(), VolgaOrganizationId, VolgaBranchId, customer.Id,
+                lead.Id, vehicle.Id, VolgaAdminUserId, 1_500_000m, 1_100_000m, 200_000m, "RUB",
+                now.AddDays(14), [], 0m, now);
+            offer.Submit(Guid.NewGuid(), true, 50_000m, offer.Version, VolgaAdminUserId, now.AddMinutes(5));
+            db.Vehicles.Add(vehicle); db.Leads.Add(lead); db.SalesOffers.Add(offer);
+            await db.SaveChangesAsync(cancellationToken);
+            if (row.Stage == 0) continue;
+
+            var snapshot = offer.ApprovedSnapshot!;
+            var reservation = Reservation.Create(Guid.NewGuid(), VolgaOrganizationId, VolgaBranchId,
+                vehicle.Id, customer.Id, lead.Id, snapshot.Id, VolgaAdminUserId, Guid.NewGuid(),
+                now.AddDays(2), false, 0m, "RUB", now.AddMinutes(6));
+            vehicle.Reserve(now.AddMinutes(6), VolgaAdminUserId); db.Reservations.Add(reservation);
+            await db.SaveChangesAsync(cancellationToken);
+            if (row.Stage == 1) continue;
+
+            reservation.ConvertToDeal(Guid.NewGuid(), reservation.Version, VolgaAdminUserId, now.AddMinutes(7));
+            vehicle.BeginSale(now.AddMinutes(7), VolgaAdminUserId);
+            var deal = Deal.Create(Guid.NewGuid(), VolgaOrganizationId, VolgaBranchId, reservation.Id,
+                snapshot.Id, customer.Id, lead.Id, vehicle.Id, VolgaAdminUserId, Guid.NewGuid(), customer.Name,
+                JsonSerializer.Serialize(new { vehicle.Make, vehicle.Model, vehicle.Vin, vehicle.Year }),
+                snapshot.LineItemsJson, snapshot.BasePriceAmount, snapshot.LineItemsAmount,
+                snapshot.DiscountAmount, snapshot.FinalPriceAmount, snapshot.CostSnapshotAmount,
+                snapshot.ExpectedMarginAmount, snapshot.Currency, false, 0m, null, now.AddMinutes(7));
+            db.Deals.Add(deal); await db.SaveChangesAsync(cancellationToken);
         }
     }
 

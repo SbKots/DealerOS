@@ -375,6 +375,646 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.Deal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ApprovedOfferSnapshotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("BasePriceAmount")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ClosureReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("CostSnapshotAmount")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<Guid>("CreateCommandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CreateSignature")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CustomerNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<decimal>("ExpectedMarginAmount")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<decimal>("FinalTotalAmount")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<Guid>("LeadId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("LineItemsAmount")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<string>("LineItemsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReservationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VehicleSnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("OrganizationId", "Id")
+                        .HasName("ak_deals_organization_id");
+
+                    b.HasIndex("OrganizationId", "ApprovedOfferSnapshotId");
+
+                    b.HasIndex("OrganizationId", "CreateCommandId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_deals_create_command");
+
+                    b.HasIndex("OrganizationId", "CreatedByUserId");
+
+                    b.HasIndex("OrganizationId", "CustomerId");
+
+                    b.HasIndex("OrganizationId", "LeadId");
+
+                    b.HasIndex("OrganizationId", "ReservationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_deals_reservation");
+
+                    b.HasIndex("OrganizationId", "VehicleId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_deals_active_completed_vehicle")
+                        .HasFilter("\"Status\" IN (1, 2, 3, 4, 6)");
+
+                    b.HasIndex("OrganizationId", "BranchId", "Status", "CreatedAt")
+                        .HasDatabaseName("ix_deals_queue");
+
+                    b.ToTable("deals", "deals", t =>
+                        {
+                            t.HasCheckConstraint("ck_deals_amounts", "\"BasePriceAmount\" > 0 AND \"LineItemsAmount\" >= 0 AND \"DiscountAmount\" >= 0 AND \"FinalTotalAmount\" > 0 AND \"CostSnapshotAmount\" >= 0");
+
+                            t.HasCheckConstraint("ck_deals_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+
+                            t.HasCheckConstraint("ck_deals_status", "\"Status\" BETWEEN 1 AND 7");
+
+                            t.HasCheckConstraint("ck_deals_version", "\"Version\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.DealDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CommandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("GeneratedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GeneratedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("SourceDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TemplateName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("TemplateVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("OrganizationId", "Id")
+                        .HasName("ak_deal_documents_organization_id");
+
+                    b.HasIndex("OrganizationId", "CommandId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_deal_documents_command");
+
+                    b.HasIndex("OrganizationId", "GeneratedByUserId");
+
+                    b.HasIndex("OrganizationId", "SourceDocumentId");
+
+                    b.HasIndex("OrganizationId", "DealId", "Type", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ux_deal_documents_revision");
+
+                    b.ToTable("documents", "deals", t =>
+                        {
+                            t.HasCheckConstraint("ck_deal_documents_revision", "\"Revision\" > 0 AND \"TemplateVersion\" > 0");
+
+                            t.HasCheckConstraint("ck_deal_documents_size", "\"SizeBytes\" > 0");
+
+                            t.HasCheckConstraint("ck_deal_documents_type", "\"Type\" BETWEEN 1 AND 2");
+                        });
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.DealHandoverSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ActualMileageKm")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Comments")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CompletedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("ConditionConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ConditionNotes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("DocumentsTransferred")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("EquipmentTransferred")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IssuerConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("KeysTransferred")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("ResponsibleConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "CompletedByUserId");
+
+                    b.HasIndex("OrganizationId", "DealId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_deal_handover");
+
+                    b.ToTable("handover_snapshots", "deals", t =>
+                        {
+                            t.HasCheckConstraint("ck_deal_handover_mileage", "\"ActualMileageKm\" BETWEEN 0 AND 3000000");
+                        });
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.DealHistory", b =>
+                {
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CommandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Signature")
+                        .HasColumnType("text");
+
+                    b.HasKey("OrganizationId", "DealId", "Id");
+
+                    b.HasIndex("OrganizationId", "ActorUserId");
+
+                    b.HasIndex("OrganizationId", "DealId", "CommandId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_deal_history_command");
+
+                    b.ToTable("deal_history", "deals");
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.DealPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<Guid>("CommandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ManualReference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("OrganizationId", "Id")
+                        .HasName("ak_deal_payments_organization_id");
+
+                    b.HasIndex("OrganizationId", "ActorUserId");
+
+                    b.HasIndex("OrganizationId", "CommandId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_deal_payments_command");
+
+                    b.HasIndex("OrganizationId", "ManualReference")
+                        .IsUnique()
+                        .HasDatabaseName("ux_deal_payments_reference");
+
+                    b.HasIndex("OrganizationId", "DealId", "OccurredAt")
+                        .HasDatabaseName("ix_deal_payments_timeline");
+
+                    b.ToTable("payments", "deals", t =>
+                        {
+                            t.HasCheckConstraint("ck_deal_payments_amount", "\"Amount\" > 0");
+
+                            t.HasCheckConstraint("ck_deal_payments_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+
+                            t.HasCheckConstraint("ck_deal_payments_kind", "\"Kind\" BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_deal_payments_status", "\"Status\" BETWEEN 1 AND 5");
+                        });
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Finance.Domain.ManualCostEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CommandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("CorrectionReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Evidence")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Signature")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("SupersedesEntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("OrganizationId", "Id")
+                        .HasName("ak_finance_cost_entries_organization_id");
+
+                    b.HasIndex("OrganizationId", "ActorUserId");
+
+                    b.HasIndex("OrganizationId", "BranchId");
+
+                    b.HasIndex("OrganizationId", "CommandId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_finance_cost_command");
+
+                    b.HasIndex("OrganizationId", "Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ux_finance_cost_reference");
+
+                    b.HasIndex("OrganizationId", "SupersedesEntryId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_finance_cost_correction")
+                        .HasFilter("\"SupersedesEntryId\" IS NOT NULL");
+
+                    b.HasIndex("OrganizationId", "VehicleId");
+
+                    b.HasIndex("OrganizationId", "DealId", "OccurredAt")
+                        .HasDatabaseName("ix_finance_cost_deal_date");
+
+                    b.ToTable("manual_cost_entries", "finance", t =>
+                        {
+                            t.HasCheckConstraint("ck_finance_cost_amount", "\"Amount\" > 0");
+
+                            t.HasCheckConstraint("ck_finance_cost_category", "\"Category\" BETWEEN 1 AND 9");
+
+                            t.HasCheckConstraint("ck_finance_cost_correction", "\"SupersedesEntryId\" IS NULL OR \"SupersedesEntryId\" <> \"Id\"");
+
+                            t.HasCheckConstraint("ck_finance_cost_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+                        });
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Finance.Domain.ProfitSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ActualMarginPercent")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)");
+
+                    b.Property<decimal>("ActualProfit")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FormulaVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("GrossRevenue")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<decimal>("ManualCost")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<decimal>("NetRevenue")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<decimal>("OperationsCost")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PlanMarginPercent")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)");
+
+                    b.Property<decimal>("PlanProfit")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<decimal>("PurchaseCost")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<decimal>("Refunds")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<Guid?>("RevisesSnapshotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SourcesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("OrganizationId", "Id")
+                        .HasName("ak_finance_profit_snapshots_organization_id");
+
+                    b.HasIndex("OrganizationId", "CreatedByUserId");
+
+                    b.HasIndex("OrganizationId", "RevisesSnapshotId");
+
+                    b.HasIndex("OrganizationId", "VehicleId");
+
+                    b.HasIndex("OrganizationId", "DealId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ux_finance_profit_deal_revision");
+
+                    b.HasIndex("OrganizationId", "BranchId", "Currency", "CreatedAt")
+                        .HasDatabaseName("ix_finance_profit_dashboard");
+
+                    b.ToTable("profit_snapshots", "finance", t =>
+                        {
+                            t.HasCheckConstraint("ck_finance_profit_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+
+                            t.HasCheckConstraint("ck_finance_profit_nonnegative", "\"GrossRevenue\" >= 0 AND \"Refunds\" >= 0 AND \"NetRevenue\" >= 0 AND \"PurchaseCost\" >= 0 AND \"OperationsCost\" >= 0 AND \"ManualCost\" >= 0 AND \"TotalCost\" >= 0");
+
+                            t.HasCheckConstraint("ck_finance_profit_revision", "\"Revision\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("DealerOS.Modules.IdentityAccess.UserAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2092,6 +2732,158 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DealerOS.Modules.Reservations.Domain.Reservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ApprovedOfferSnapshotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ClosureReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("CreateCommandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CreateSignature")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DepositAmount")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)");
+
+                    b.Property<string>("DepositReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("DepositStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("LeadId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("OrganizationId", "Id")
+                        .HasName("ak_reservations_organization_id");
+
+                    b.HasIndex("OrganizationId", "ApprovedOfferSnapshotId");
+
+                    b.HasIndex("OrganizationId", "CreateCommandId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_reservations_create_command");
+
+                    b.HasIndex("OrganizationId", "CreatedByUserId");
+
+                    b.HasIndex("OrganizationId", "CustomerId");
+
+                    b.HasIndex("OrganizationId", "LeadId");
+
+                    b.HasIndex("OrganizationId", "VehicleId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_reservations_active_vehicle")
+                        .HasFilter("\"Status\" IN (1, 2)");
+
+                    b.HasIndex("OrganizationId", "BranchId", "Status", "ExpiresAt")
+                        .HasDatabaseName("ix_reservations_queue");
+
+                    b.ToTable("reservations", "reservations", t =>
+                        {
+                            t.HasCheckConstraint("ck_reservations_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+
+                            t.HasCheckConstraint("ck_reservations_deposit_amount", "\"DepositAmount\" >= 0");
+
+                            t.HasCheckConstraint("ck_reservations_deposit_status", "\"DepositStatus\" BETWEEN 1 AND 6");
+
+                            t.HasCheckConstraint("ck_reservations_expiration", "\"ExpiresAt\" > \"StartsAt\"");
+
+                            t.HasCheckConstraint("ck_reservations_status", "\"Status\" BETWEEN 1 AND 6");
+
+                            t.HasCheckConstraint("ck_reservations_version", "\"Version\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Reservations.Domain.ReservationHistory", b =>
+                {
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReservationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CommandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Signature")
+                        .HasColumnType("text");
+
+                    b.HasKey("OrganizationId", "ReservationId", "Id");
+
+                    b.HasIndex("OrganizationId", "ActorUserId");
+
+                    b.HasIndex("OrganizationId", "ReservationId", "CommandId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_reservation_history_command");
+
+                    b.ToTable("reservation_history", "reservations");
+                });
+
             modelBuilder.Entity("DealerOS.Modules.Sales.Domain.ApprovedOfferSnapshot", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2153,6 +2945,9 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasAlternateKey("OrganizationId", "Id")
+                        .HasName("ak_sales_offer_snapshots_organization_id");
 
                     b.HasIndex("OrganizationId", "ApprovedByUserId");
 
@@ -2644,7 +3439,7 @@ namespace DealerOS.Api.Infrastructure.Migrations
 
                     b.ToTable("vehicles", "vehicles", t =>
                         {
-                            t.HasCheckConstraint("ck_vehicles_acceptance_state", "(\"Status\" = 1 AND \"AcceptedAt\" IS NULL AND \"StockNumber\" IS NULL) OR (\"Status\" IN (2, 3, 4, 5, 6) AND \"AcceptedAt\" IS NOT NULL AND \"StockNumber\" IS NOT NULL)");
+                            t.HasCheckConstraint("ck_vehicles_acceptance_state", "(\"Status\" = 1 AND \"AcceptedAt\" IS NULL AND \"StockNumber\" IS NULL) OR (\"Status\" BETWEEN 2 AND 9 AND \"AcceptedAt\" IS NOT NULL AND \"StockNumber\" IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_vehicles_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
 
@@ -2652,7 +3447,7 @@ namespace DealerOS.Api.Infrastructure.Migrations
 
                             t.HasCheckConstraint("ck_vehicles_purchase_amount", "\"PlannedPurchaseAmount\" > 0");
 
-                            t.HasCheckConstraint("ck_vehicles_status", "\"Status\" IN (1, 2, 3, 4, 5, 6)");
+                            t.HasCheckConstraint("ck_vehicles_status", "\"Status\" BETWEEN 1 AND 9");
 
                             t.HasCheckConstraint("ck_vehicles_version", "\"Version\" > 0");
 
@@ -2693,9 +3488,9 @@ namespace DealerOS.Api.Infrastructure.Migrations
 
                     b.ToTable("status_history", "vehicles", t =>
                         {
-                            t.HasCheckConstraint("ck_status_history_from", "\"FromStatus\" IS NULL OR \"FromStatus\" IN (1, 2, 3, 4, 5, 6)");
+                            t.HasCheckConstraint("ck_status_history_from", "\"FromStatus\" IS NULL OR \"FromStatus\" BETWEEN 1 AND 9");
 
-                            t.HasCheckConstraint("ck_status_history_to", "\"ToStatus\" IN (1, 2, 3, 4, 5, 6)");
+                            t.HasCheckConstraint("ck_status_history_to", "\"ToStatus\" BETWEEN 1 AND 9");
                         });
                 });
 
@@ -2811,6 +3606,206 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         .HasForeignKey("OrganizationId", "LeadId")
                         .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.Deal", b =>
+                {
+                    b.HasOne("DealerOS.Modules.Sales.Domain.ApprovedOfferSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ApprovedOfferSnapshotId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Organizations.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "BranchId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "CreatedByUserId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Crm.Domain.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "CustomerId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Crm.Domain.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "LeadId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Reservations.Domain.Reservation", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ReservationId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Vehicles.Domain.Vehicle", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "VehicleId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.DealDocument", b =>
+                {
+                    b.HasOne("DealerOS.Modules.Deals.Domain.Deal", null)
+                        .WithMany("Documents")
+                        .HasForeignKey("OrganizationId", "DealId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "GeneratedByUserId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Deals.Domain.DealDocument", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "SourceDocumentId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.DealHandoverSnapshot", b =>
+                {
+                    b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "CompletedByUserId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Deals.Domain.Deal", null)
+                        .WithOne("Handover")
+                        .HasForeignKey("DealerOS.Modules.Deals.Domain.DealHandoverSnapshot", "OrganizationId", "DealId")
+                        .HasPrincipalKey("DealerOS.Modules.Deals.Domain.Deal", "OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.DealHistory", b =>
+                {
+                    b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ActorUserId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Deals.Domain.Deal", null)
+                        .WithMany("History")
+                        .HasForeignKey("OrganizationId", "DealId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.DealPayment", b =>
+                {
+                    b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ActorUserId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Deals.Domain.Deal", null)
+                        .WithMany("Payments")
+                        .HasForeignKey("OrganizationId", "DealId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Finance.Domain.ManualCostEntry", b =>
+                {
+                    b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ActorUserId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Organizations.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "BranchId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Deals.Domain.Deal", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "DealId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Finance.Domain.ManualCostEntry", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "SupersedesEntryId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DealerOS.Modules.Vehicles.Domain.Vehicle", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "VehicleId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Finance.Domain.ProfitSnapshot", b =>
+                {
+                    b.HasOne("DealerOS.Modules.Organizations.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "BranchId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "CreatedByUserId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Deals.Domain.Deal", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "DealId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Finance.Domain.ProfitSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "RevisesSnapshotId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DealerOS.Modules.Vehicles.Domain.Vehicle", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "VehicleId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
@@ -3353,6 +4348,68 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("DealerOS.Modules.Reservations.Domain.Reservation", b =>
+                {
+                    b.HasOne("DealerOS.Modules.Sales.Domain.ApprovedOfferSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ApprovedOfferSnapshotId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Organizations.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "BranchId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "CreatedByUserId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Crm.Domain.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "CustomerId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Crm.Domain.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "LeadId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Vehicles.Domain.Vehicle", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "VehicleId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Reservations.Domain.ReservationHistory", b =>
+                {
+                    b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "ActorUserId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DealerOS.Modules.Reservations.Domain.Reservation", null)
+                        .WithMany("History")
+                        .HasForeignKey("OrganizationId", "ReservationId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DealerOS.Modules.Sales.Domain.ApprovedOfferSnapshot", b =>
                 {
                     b.HasOne("DealerOS.Modules.IdentityAccess.UserAccount", null)
@@ -3567,6 +4624,17 @@ namespace DealerOS.Api.Infrastructure.Migrations
                     b.Navigation("History");
                 });
 
+            modelBuilder.Entity("DealerOS.Modules.Deals.Domain.Deal", b =>
+                {
+                    b.Navigation("Documents");
+
+                    b.Navigation("Handover");
+
+                    b.Navigation("History");
+
+                    b.Navigation("Payments");
+                });
+
             modelBuilder.Entity("DealerOS.Modules.IdentityAccess.UserAccount", b =>
                 {
                     b.Navigation("BranchAccess");
@@ -3626,6 +4694,11 @@ namespace DealerOS.Api.Infrastructure.Migrations
                     b.Navigation("Omissions");
 
                     b.Navigation("Works");
+                });
+
+            modelBuilder.Entity("DealerOS.Modules.Reservations.Domain.Reservation", b =>
+                {
+                    b.Navigation("History");
                 });
 
             modelBuilder.Entity("DealerOS.Modules.Sales.Domain.SalesOffer", b =>

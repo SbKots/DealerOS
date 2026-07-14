@@ -1,9 +1,12 @@
 using DealerOS.Modules.Crm.Domain;
+using DealerOS.Modules.Deals.Domain;
+using DealerOS.Modules.Finance.Domain;
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Domain;
 using DealerOS.Modules.Operations.Domain;
 using DealerOS.Modules.Organizations;
 using DealerOS.Modules.Reconditioning.Domain;
+using DealerOS.Modules.Reservations.Domain;
 using DealerOS.Modules.Sales.Domain;
 using DealerOS.Modules.Vehicles.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +57,15 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
     public DbSet<SalesOfferHistory> SalesOfferHistory => Set<SalesOfferHistory>();
     public DbSet<SalesOfferDecision> SalesOfferDecisions => Set<SalesOfferDecision>();
     public DbSet<ApprovedOfferSnapshot> ApprovedOfferSnapshots => Set<ApprovedOfferSnapshot>();
+    public DbSet<Reservation> Reservations => Set<Reservation>();
+    public DbSet<ReservationHistory> ReservationHistory => Set<ReservationHistory>();
+    public DbSet<Deal> Deals => Set<Deal>();
+    public DbSet<DealHistory> DealHistory => Set<DealHistory>();
+    public DbSet<DealPayment> DealPayments => Set<DealPayment>();
+    public DbSet<DealDocument> DealDocuments => Set<DealDocument>();
+    public DbSet<DealHandoverSnapshot> DealHandovers => Set<DealHandoverSnapshot>();
+    public DbSet<ManualCostEntry> ManualCostEntries => Set<ManualCostEntry>();
+    public DbSet<ProfitSnapshot> ProfitSnapshots => Set<ProfitSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -121,9 +133,9 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
                 table.HasCheckConstraint("ck_vehicles_mileage", "\"MileageKm\" >= 0 AND \"MileageKm\" <= 3000000");
                 table.HasCheckConstraint("ck_vehicles_purchase_amount", "\"PlannedPurchaseAmount\" > 0");
                 table.HasCheckConstraint("ck_vehicles_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
-                table.HasCheckConstraint("ck_vehicles_status", "\"Status\" IN (1, 2, 3, 4, 5, 6)");
+                table.HasCheckConstraint("ck_vehicles_status", "\"Status\" BETWEEN 1 AND 9");
                 table.HasCheckConstraint("ck_vehicles_version", "\"Version\" > 0");
-                table.HasCheckConstraint("ck_vehicles_acceptance_state", "(\"Status\" = 1 AND \"AcceptedAt\" IS NULL AND \"StockNumber\" IS NULL) OR (\"Status\" IN (2, 3, 4, 5, 6) AND \"AcceptedAt\" IS NOT NULL AND \"StockNumber\" IS NOT NULL)");
+                table.HasCheckConstraint("ck_vehicles_acceptance_state", "(\"Status\" = 1 AND \"AcceptedAt\" IS NULL AND \"StockNumber\" IS NULL) OR (\"Status\" BETWEEN 2 AND 9 AND \"AcceptedAt\" IS NOT NULL AND \"StockNumber\" IS NOT NULL)");
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
@@ -154,8 +166,8 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
         {
             entity.ToTable("status_history", "vehicles", table =>
             {
-                table.HasCheckConstraint("ck_status_history_from", "\"FromStatus\" IS NULL OR \"FromStatus\" IN (1, 2, 3, 4, 5, 6)");
-                table.HasCheckConstraint("ck_status_history_to", "\"ToStatus\" IN (1, 2, 3, 4, 5, 6)");
+                table.HasCheckConstraint("ck_status_history_from", "\"FromStatus\" IS NULL OR \"FromStatus\" BETWEEN 1 AND 9");
+                table.HasCheckConstraint("ck_status_history_to", "\"ToStatus\" BETWEEN 1 AND 9");
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).ValueGeneratedNever();
@@ -1089,6 +1101,8 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
             entity.ToTable("approved_offer_snapshots", "sales", table => table.HasCheckConstraint(
                 "ck_sales_offer_snapshot_amounts", "\"BasePriceAmount\" > 0 AND \"LineItemsAmount\" >= 0 AND \"DiscountAmount\" >= 0 AND \"FinalPriceAmount\" > 0 AND \"CostSnapshotAmount\" >= 0 AND \"MinimumMarginAmount\" >= 0"));
             entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id })
+                .HasName("ak_sales_offer_snapshots_organization_id");
             entity.HasIndex(x => new { x.OrganizationId, x.OfferId }).IsUnique()
                 .HasDatabaseName("ux_sales_offer_snapshot");
             entity.Property(x => x.BasePriceAmount).HasPrecision(19, 2);
@@ -1103,6 +1117,275 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
                 .HasForeignKey<ApprovedOfferSnapshot>(x => new { x.OrganizationId, x.OfferId })
                 .HasPrincipalKey<SalesOffer>(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ApprovedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Reservation>(entity =>
+        {
+            entity.ToTable("reservations", "reservations", table =>
+            {
+                table.HasCheckConstraint("ck_reservations_status", "\"Status\" BETWEEN 1 AND 6");
+                table.HasCheckConstraint("ck_reservations_deposit_status", "\"DepositStatus\" BETWEEN 1 AND 6");
+                table.HasCheckConstraint("ck_reservations_deposit_amount", "\"DepositAmount\" >= 0");
+                table.HasCheckConstraint("ck_reservations_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+                table.HasCheckConstraint("ck_reservations_expiration", "\"ExpiresAt\" > \"StartsAt\"");
+                table.HasCheckConstraint("ck_reservations_version", "\"Version\" > 0");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id })
+                .HasName("ak_reservations_organization_id");
+            entity.Property(x => x.CreateSignature).HasColumnType("text");
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.DepositAmount).HasPrecision(19, 2);
+            entity.Property(x => x.DepositReference).HasMaxLength(200);
+            entity.Property(x => x.ClosureReason).HasMaxLength(2000);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.OrganizationId, x.CreateCommandId }).IsUnique()
+                .HasDatabaseName("ux_reservations_create_command");
+            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId }).IsUnique()
+                .HasFilter("\"Status\" IN (1, 2)").HasDatabaseName("ux_reservations_active_vehicle");
+            entity.HasIndex(x => new { x.OrganizationId, x.BranchId, x.Status, x.ExpiresAt })
+                .HasDatabaseName("ix_reservations_queue");
+            entity.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Vehicle>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Customer>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CustomerId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lead>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.LeadId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ApprovedOfferSnapshot>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.ApprovedOfferSnapshotId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.History).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ReservationHistory>(entity =>
+        {
+            entity.ToTable("reservation_history", "reservations");
+            entity.HasKey(x => new { x.OrganizationId, x.ReservationId, x.Id });
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Operation).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Signature).HasColumnType("text");
+            entity.HasIndex(x => new { x.OrganizationId, x.ReservationId, x.CommandId }).IsUnique()
+                .HasDatabaseName("ux_reservation_history_command");
+            entity.HasOne<Reservation>().WithMany(x => x.History)
+                .HasForeignKey(x => new { x.OrganizationId, x.ReservationId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Deal>(entity =>
+        {
+            entity.ToTable("deals", "deals", table =>
+            {
+                table.HasCheckConstraint("ck_deals_status", "\"Status\" BETWEEN 1 AND 7");
+                table.HasCheckConstraint("ck_deals_amounts", "\"BasePriceAmount\" > 0 AND \"LineItemsAmount\" >= 0 AND \"DiscountAmount\" >= 0 AND \"FinalTotalAmount\" > 0 AND \"CostSnapshotAmount\" >= 0");
+                table.HasCheckConstraint("ck_deals_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+                table.HasCheckConstraint("ck_deals_version", "\"Version\" > 0");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_deals_organization_id");
+            entity.Property(x => x.CreateSignature).HasColumnType("text");
+            entity.Property(x => x.CustomerNameSnapshot).HasMaxLength(300);
+            entity.Property(x => x.VehicleSnapshotJson).HasColumnType("jsonb");
+            entity.Property(x => x.LineItemsJson).HasColumnType("jsonb");
+            entity.Property(x => x.BasePriceAmount).HasPrecision(19, 2);
+            entity.Property(x => x.LineItemsAmount).HasPrecision(19, 2);
+            entity.Property(x => x.DiscountAmount).HasPrecision(19, 2);
+            entity.Property(x => x.FinalTotalAmount).HasPrecision(19, 2);
+            entity.Property(x => x.CostSnapshotAmount).HasPrecision(19, 2);
+            entity.Property(x => x.ExpectedMarginAmount).HasPrecision(19, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3);
+            entity.Property(x => x.ClosureReason).HasMaxLength(2000);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.Ignore(x => x.ReceivedTotal); entity.Ignore(x => x.RefundedTotal);
+            entity.Ignore(x => x.NetPaid); entity.Ignore(x => x.Balance);
+            entity.HasIndex(x => new { x.OrganizationId, x.CreateCommandId }).IsUnique()
+                .HasDatabaseName("ux_deals_create_command");
+            entity.HasIndex(x => new { x.OrganizationId, x.ReservationId }).IsUnique()
+                .HasDatabaseName("ux_deals_reservation");
+            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId }).IsUnique()
+                .HasFilter("\"Status\" IN (1, 2, 3, 4, 6)").HasDatabaseName("ux_deals_active_completed_vehicle");
+            entity.HasIndex(x => new { x.OrganizationId, x.BranchId, x.Status, x.CreatedAt })
+                .HasDatabaseName("ix_deals_queue");
+            entity.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Reservation>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ReservationId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ApprovedOfferSnapshot>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, x.ApprovedOfferSnapshotId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Customer>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CustomerId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Lead>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.LeadId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Vehicle>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.History).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.Payments).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.Documents).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<DealHistory>(entity =>
+        {
+            entity.ToTable("deal_history", "deals");
+            entity.HasKey(x => new { x.OrganizationId, x.DealId, x.Id }); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Operation).HasMaxLength(50); entity.Property(x => x.Signature).HasColumnType("text");
+            entity.HasIndex(x => new { x.OrganizationId, x.DealId, x.CommandId }).IsUnique()
+                .HasDatabaseName("ux_deal_history_command");
+            entity.HasOne<Deal>().WithMany(x => x.History).HasForeignKey(x => new { x.OrganizationId, x.DealId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DealPayment>(entity =>
+        {
+            entity.ToTable("payments", "deals", table =>
+            {
+                table.HasCheckConstraint("ck_deal_payments_kind", "\"Kind\" BETWEEN 1 AND 4");
+                table.HasCheckConstraint("ck_deal_payments_status", "\"Status\" BETWEEN 1 AND 5");
+                table.HasCheckConstraint("ck_deal_payments_amount", "\"Amount\" > 0");
+                table.HasCheckConstraint("ck_deal_payments_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_deal_payments_organization_id");
+            entity.Property(x => x.Amount).HasPrecision(19, 2); entity.Property(x => x.Currency).HasMaxLength(3);
+            entity.Property(x => x.ManualReference).HasMaxLength(200); entity.Property(x => x.Reason).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.OrganizationId, x.CommandId }).IsUnique()
+                .HasDatabaseName("ux_deal_payments_command");
+            entity.HasIndex(x => new { x.OrganizationId, x.ManualReference }).IsUnique()
+                .HasDatabaseName("ux_deal_payments_reference");
+            entity.HasIndex(x => new { x.OrganizationId, x.DealId, x.OccurredAt })
+                .HasDatabaseName("ix_deal_payments_timeline");
+            entity.HasOne<Deal>().WithMany(x => x.Payments).HasForeignKey(x => new { x.OrganizationId, x.DealId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DealDocument>(entity =>
+        {
+            entity.ToTable("documents", "deals", table =>
+            {
+                table.HasCheckConstraint("ck_deal_documents_type", "\"Type\" BETWEEN 1 AND 2");
+                table.HasCheckConstraint("ck_deal_documents_revision", "\"Revision\" > 0 AND \"TemplateVersion\" > 0");
+                table.HasCheckConstraint("ck_deal_documents_size", "\"SizeBytes\" > 0");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_deal_documents_organization_id");
+            entity.Property(x => x.Number).HasMaxLength(100); entity.Property(x => x.TemplateName).HasMaxLength(100);
+            entity.Property(x => x.Sha256).HasMaxLength(64); entity.Property(x => x.ObjectKey).HasMaxLength(1000);
+            entity.Property(x => x.Reason).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.OrganizationId, x.CommandId }).IsUnique()
+                .HasDatabaseName("ux_deal_documents_command");
+            entity.HasIndex(x => new { x.OrganizationId, x.DealId, x.Type, x.Revision }).IsUnique()
+                .HasDatabaseName("ux_deal_documents_revision");
+            entity.HasOne<Deal>().WithMany(x => x.Documents).HasForeignKey(x => new { x.OrganizationId, x.DealId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<DealDocument>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, Id = x.SourceDocumentId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.GeneratedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DealHandoverSnapshot>(entity =>
+        {
+            entity.ToTable("handover_snapshots", "deals", table => table.HasCheckConstraint(
+                "ck_deal_handover_mileage", "\"ActualMileageKm\" BETWEEN 0 AND 3000000"));
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasIndex(x => new { x.OrganizationId, x.DealId }).IsUnique()
+                .HasDatabaseName("ux_deal_handover");
+            entity.Property(x => x.ConditionNotes).HasMaxLength(2000); entity.Property(x => x.Comments).HasMaxLength(2000);
+            entity.HasOne<Deal>().WithOne(x => x.Handover).HasForeignKey<DealHandoverSnapshot>(x =>
+                new { x.OrganizationId, x.DealId }).HasPrincipalKey<Deal>(x => new { x.OrganizationId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CompletedByUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ManualCostEntry>(entity =>
+        {
+            entity.ToTable("manual_cost_entries", "finance", table =>
+            {
+                table.HasCheckConstraint("ck_finance_cost_category", "\"Category\" BETWEEN 1 AND 9");
+                table.HasCheckConstraint("ck_finance_cost_amount", "\"Amount\" > 0");
+                table.HasCheckConstraint("ck_finance_cost_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+                table.HasCheckConstraint("ck_finance_cost_correction", "\"SupersedesEntryId\" IS NULL OR \"SupersedesEntryId\" <> \"Id\"");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id })
+                .HasName("ak_finance_cost_entries_organization_id");
+            entity.Property(x => x.Signature).HasColumnType("text");
+            entity.Property(x => x.Source).HasMaxLength(100); entity.Property(x => x.Reference).HasMaxLength(200);
+            entity.Property(x => x.Amount).HasPrecision(19, 2); entity.Property(x => x.Currency).HasMaxLength(3);
+            entity.Property(x => x.Evidence).HasMaxLength(1000); entity.Property(x => x.Comment).HasMaxLength(2000);
+            entity.Property(x => x.CorrectionReason).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.OrganizationId, x.CommandId }).IsUnique()
+                .HasDatabaseName("ux_finance_cost_command");
+            entity.HasIndex(x => new { x.OrganizationId, x.Reference }).IsUnique()
+                .HasDatabaseName("ux_finance_cost_reference");
+            entity.HasIndex(x => new { x.OrganizationId, x.DealId, x.OccurredAt })
+                .HasDatabaseName("ix_finance_cost_deal_date");
+            entity.HasIndex(x => new { x.OrganizationId, x.SupersedesEntryId }).IsUnique()
+                .HasFilter("\"SupersedesEntryId\" IS NOT NULL").HasDatabaseName("ux_finance_cost_correction");
+            entity.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Vehicle>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Deal>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.DealId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ManualCostEntry>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, Id = x.SupersedesEntryId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.ActorUserId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProfitSnapshot>(entity =>
+        {
+            entity.ToTable("profit_snapshots", "finance", table =>
+            {
+                table.HasCheckConstraint("ck_finance_profit_revision", "\"Revision\" > 0");
+                table.HasCheckConstraint("ck_finance_profit_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
+                table.HasCheckConstraint("ck_finance_profit_nonnegative", "\"GrossRevenue\" >= 0 AND \"Refunds\" >= 0 AND \"NetRevenue\" >= 0 AND \"PurchaseCost\" >= 0 AND \"OperationsCost\" >= 0 AND \"ManualCost\" >= 0 AND \"TotalCost\" >= 0");
+            });
+            entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.HasAlternateKey(x => new { x.OrganizationId, x.Id })
+                .HasName("ak_finance_profit_snapshots_organization_id");
+            entity.Property(x => x.Reason).HasMaxLength(2000); entity.Property(x => x.FormulaVersion).HasMaxLength(50);
+            entity.Property(x => x.Currency).HasMaxLength(3); entity.Property(x => x.SourcesJson).HasColumnType("jsonb");
+            entity.Property(x => x.Sha256).HasMaxLength(64);
+            entity.Property(x => x.GrossRevenue).HasPrecision(19, 2); entity.Property(x => x.Refunds).HasPrecision(19, 2);
+            entity.Property(x => x.NetRevenue).HasPrecision(19, 2); entity.Property(x => x.PurchaseCost).HasPrecision(19, 2);
+            entity.Property(x => x.OperationsCost).HasPrecision(19, 2); entity.Property(x => x.ManualCost).HasPrecision(19, 2);
+            entity.Property(x => x.TotalCost).HasPrecision(19, 2); entity.Property(x => x.ActualProfit).HasPrecision(19, 2);
+            entity.Property(x => x.ActualMarginPercent).HasPrecision(9, 2); entity.Property(x => x.PlanProfit).HasPrecision(19, 2);
+            entity.Property(x => x.PlanMarginPercent).HasPrecision(9, 2);
+            entity.HasIndex(x => new { x.OrganizationId, x.DealId, x.Revision }).IsUnique()
+                .HasDatabaseName("ux_finance_profit_deal_revision");
+            entity.HasIndex(x => new { x.OrganizationId, x.BranchId, x.Currency, x.CreatedAt })
+                .HasDatabaseName("ix_finance_profit_dashboard");
+            entity.HasOne<Branch>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.BranchId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Deal>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.DealId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Vehicle>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.VehicleId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProfitSnapshot>().WithMany()
+                .HasForeignKey(x => new { x.OrganizationId, Id = x.RevisesSnapshotId })
+                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
                 .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         });
     }

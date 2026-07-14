@@ -6,7 +6,7 @@ const image = (name: string) => ({
   buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
 })
 
-test('release train 0.4-0.7 moves a prepared vehicle to an immutable approved offer', async ({ page }) => {
+test('release train 0.4-1.0 moves an approved offer through Sold to auditable profit', async ({ page }) => {
   test.setTimeout(420_000)
   const browserErrors: string[] = []
   page.on('pageerror', (error) => browserErrors.push(error.message))
@@ -126,6 +126,10 @@ test('release train 0.4-0.7 moves a prepared vehicle to an immutable approved of
   await page.getByRole('button', { name: 'Проверить и сделать Listing Ready' }).click()
   await listingReady
   await expect(page.locator('.status').filter({ hasText: 'Listing Ready' })).toBeVisible()
+  await page.getByRole('button', { name: 'Manual export JSON' }).click()
+  await expect(page.locator('.snapshot-preview')).toBeVisible()
+  await page.getByRole('button', { name: 'Подтвердить Published вручную' }).click()
+  await expect(page.getByText(/demo-channel · Published/)).toBeVisible()
 
   await switchSession(page, managerSession)
   await navigate(page, 'Клиенты и лиды')
@@ -177,6 +181,45 @@ test('release train 0.4-0.7 moves a prepared vehicle to an immutable approved of
   await page.getByRole('button', { name: 'Утвердить Offer' }).click()
   await expect(page.getByText('Immutable Approved Offer')).toBeVisible()
   await expect(page.locator('.offer-card .status')).toContainText('Approved')
+
+  await navigate(page, 'Брони')
+  const approvedOption = page.getByRole('option').filter({ hasText: customer })
+  const approvedSnapshotId = await approvedOption.getAttribute('value')
+  expect(approvedSnapshotId).toBeTruthy()
+  await page.getByLabel('Approved Offer для брони').selectOption(approvedSnapshotId!)
+  await page.getByRole('button', { name: 'Создать бронь' }).click()
+  await expect(page.locator('.reservation-card')).toContainText(customer)
+  await expect(page.locator('.reservation-card .status')).toContainText('Active')
+  await expect(page.locator('.reservation-card .countdown')).toContainText(/ч .*мин/)
+
+  await navigate(page, 'Сделки')
+  const activeReservation = page.getByRole('option').filter({ hasText: customer })
+  const reservationId = await activeReservation.getAttribute('value')
+  expect(reservationId).toBeTruthy()
+  await page.getByLabel('Active Reservation для сделки').selectOption(reservationId!)
+  await page.getByRole('button', { name: 'Создать Deal snapshot' }).click()
+  await expect(page.locator('.deal-workspace .status')).toContainText('Draft')
+  await page.getByRole('button', { name: 'Перейти к оплате' }).click()
+  await page.getByRole('button', { name: 'Зарегистрировать оплату' }).click()
+  await expect(page.getByText('Payment · Received')).toBeVisible()
+  await page.getByRole('button', { name: 'Сформировать PDF' }).first().click()
+  await expect(page.getByRole('button', { name: 'Скачать PDF' })).toHaveCount(1)
+  await page.getByRole('button', { name: 'Сформировать PDF' }).click()
+  await expect(page.getByRole('button', { name: 'Скачать PDF' })).toHaveCount(2)
+  await page.getByRole('button', { name: 'Проверить готовность к выдаче' }).click()
+  await expect(page.locator('.deal-workspace .status')).toContainText('ReadyForHandover')
+  await page.getByRole('button', { name: 'Завершить checklist выдачи' }).click()
+  await page.getByRole('button', { name: 'Выдать автомобиль и завершить Deal' }).click()
+  await expect(page.getByText('Автомобиль продан')).toBeVisible()
+  await expect(page.locator('.deal-workspace .status')).toContainText('Completed')
+  await navigate(page, 'Экономика')
+  await expect(page.getByRole('heading', { name: 'Экономика проданных автомобилей' })).toBeVisible()
+  const soldRow = page.getByRole('row').filter({ hasText: vin })
+  await expect(soldRow).toContainText(`Volkswagen ${model}`)
+  await soldRow.getByRole('button', { name: 'Источники →' }).click()
+  await expect(page.getByText('Продажа (Deal)')).toBeVisible()
+  await expect(page.getByText('Закупка (Vehicle)')).toBeVisible()
+  await expect(page.getByText(/Revision 1 · Deal completed/)).toBeVisible()
   expect(browserErrors).toEqual([])
 })
 

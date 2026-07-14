@@ -5,10 +5,13 @@ using DealerOS.Api.Auth;
 using DealerOS.Api.Endpoints;
 using DealerOS.Api.Infrastructure;
 using DealerOS.Modules.Crm.Application;
+using DealerOS.Modules.Deals.Application;
+using DealerOS.Modules.Finance.Application;
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Application;
 using DealerOS.Modules.Operations.Application;
 using DealerOS.Modules.Reconditioning.Application;
+using DealerOS.Modules.Reservations.Application;
 using DealerOS.Modules.Sales.Application;
 using DealerOS.Modules.Vehicles.Application;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -84,7 +87,20 @@ builder.Services.AddScoped<CrmService>();
 builder.Services.AddScoped<SalesStore>();
 builder.Services.AddScoped<ISalesStore>(sp => sp.GetRequiredService<SalesStore>());
 builder.Services.AddScoped<SalesService>();
+builder.Services.AddScoped<ReservationStore>();
+builder.Services.AddScoped<IReservationStore>(sp => sp.GetRequiredService<ReservationStore>());
+builder.Services.AddScoped<ReservationService>();
+builder.Services.AddScoped<DealStore>();
+builder.Services.AddScoped<IDealStore>(sp => sp.GetRequiredService<DealStore>());
+builder.Services.AddScoped<IDealDocumentStorage, MinioDealDocumentStorage>();
+builder.Services.AddSingleton<IDealPdfGenerator, PdfSharpDealPdfGenerator>();
+builder.Services.AddScoped<DealService>();
+builder.Services.AddScoped<FinanceStore>();
+builder.Services.AddScoped<IFinanceStore>(sp => sp.GetRequiredService<FinanceStore>());
+builder.Services.AddScoped<IProfitSnapshotWriter>(sp => sp.GetRequiredService<FinanceStore>());
+builder.Services.AddScoped<FinanceService>();
 builder.Services.AddHostedService<OperationsDeadlineWorker>();
+builder.Services.AddHostedService<ReservationExpirationWorker>();
 builder.Services.AddSingleton<IMinioClient>(_ =>
 {
     var endpoint = builder.Configuration["ObjectStorage:Endpoint"]
@@ -157,9 +173,17 @@ var app = builder.Build();
 app.Use(async (context, next) =>
 {
     var supplied = context.Request.Headers["X-Correlation-ID"].FirstOrDefault();
-    context.TraceIdentifier = !string.IsNullOrWhiteSpace(supplied) && supplied.Length <= 100 ? supplied : Guid.NewGuid().ToString("N");
+    var safeSupplied = !string.IsNullOrWhiteSpace(supplied) && supplied.Length <= 100
+        && supplied.All(character => char.IsLetterOrDigit(character) || character is '-' or '_' or '.' or ':');
+    context.TraceIdentifier = safeSupplied ? supplied! : Guid.NewGuid().ToString("N");
     context.Response.Headers["X-Correlation-ID"] = context.TraceIdentifier;
-    await next();
+    using (app.Logger.BeginScope(new Dictionary<string, object?> { ["CorrelationId"] = context.TraceIdentifier }))
+    {
+        await next();
+        app.Logger.LogInformation("HTTP {Method} {Path} completed with {StatusCode} CorrelationId={CorrelationId}",
+            context.Request.Method, context.Request.Path.Value, context.Response.StatusCode,
+            context.TraceIdentifier);
+    }
 });
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseCors();
@@ -197,6 +221,9 @@ app.MapOperationsEndpoints();
 app.MapQualityListingEndpoints();
 app.MapCrmEndpoints();
 app.MapSalesEndpoints();
+app.MapReservationEndpoints();
+app.MapDealEndpoints();
+app.MapFinanceEndpoints();
 app.Run();
 
 public partial class Program;
