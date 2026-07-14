@@ -1,5 +1,17 @@
 # Backlog
 
+## Готово в коде — итерация 0.9
+
+- атомарное преобразование Active Reservation в immutable Deal snapshot и `SaleInProgress`;
+- append-only Deposit/Payment/Refund/Adjustment с idempotency, currency и reconciliation;
+- два настоящих private PDF, SHA-256, template revision, download permission и audit;
+- `AwaitingPayment → ReadyForHandover → Completed`, обязательный checklist и server blockers;
+- отмена без денег либо `RefundPending → Refunded` с освобождением автомобиля;
+- атомарный `Vehicle Sold`, финальность повторной продажи и automatic listing unpublish;
+- unit, PostgreSQL+MinIO integration, component и Playwright lifecycle до Sold.
+
+Следующий checkpoint: immutable ProfitSnapshot, plan/fact dashboard, CSV и локальная операционная проверяемость 1.0.
+
 ## Готово в коде — итерация 0.8
 
 - бронь только из действующего актуального Approved Offer snapshot;
@@ -75,8 +87,7 @@
 
 ## Следующая продуктовая граница
 
-1. Deal snapshot, оплата, договоры и выдача.
-2. Итоговая экономика plan/fact по завершённой продаже.
+1. Итоговая экономика plan/fact по завершённой продаже.
 
 ## Позже по MVP
 

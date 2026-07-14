@@ -5,6 +5,7 @@ using DealerOS.Api.Auth;
 using DealerOS.Api.Endpoints;
 using DealerOS.Api.Infrastructure;
 using DealerOS.Modules.Crm.Application;
+using DealerOS.Modules.Deals.Application;
 using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Application;
 using DealerOS.Modules.Operations.Application;
@@ -88,6 +89,11 @@ builder.Services.AddScoped<SalesService>();
 builder.Services.AddScoped<ReservationStore>();
 builder.Services.AddScoped<IReservationStore>(sp => sp.GetRequiredService<ReservationStore>());
 builder.Services.AddScoped<ReservationService>();
+builder.Services.AddScoped<DealStore>();
+builder.Services.AddScoped<IDealStore>(sp => sp.GetRequiredService<DealStore>());
+builder.Services.AddScoped<IDealDocumentStorage, MinioDealDocumentStorage>();
+builder.Services.AddSingleton<IDealPdfGenerator, PdfSharpDealPdfGenerator>();
+builder.Services.AddScoped<DealService>();
 builder.Services.AddHostedService<OperationsDeadlineWorker>();
 builder.Services.AddHostedService<ReservationExpirationWorker>();
 builder.Services.AddSingleton<IMinioClient>(_ =>
@@ -203,6 +209,7 @@ app.MapQualityListingEndpoints();
 app.MapCrmEndpoints();
 app.MapSalesEndpoints();
 app.MapReservationEndpoints();
+app.MapDealEndpoints();
 app.Run();
 
 public partial class Program;

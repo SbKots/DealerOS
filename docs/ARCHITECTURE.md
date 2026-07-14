@@ -1,5 +1,13 @@
 # Архитектура
 
+## Дополнение 0.9: Deals, Payment ledger и private PDF
+
+Модуль `Deals` владеет Deal snapshot, append-only Payment/Refund, versioned Document metadata и immutable Handover snapshot. Создание Deal атомарно преобразует `Active Reservation → ConvertedToDeal` и `Vehicle Reserved → SaleInProgress`; завершение одной транзакцией делает Deal `Completed`, Vehicle `Sold` и переводит опубликованные каналы Listing в `Unpublished`. Partial unique constraints и optimistic concurrency исключают две активные/завершённые сделки и два результата конкурентного Complete/Cancel.
+
+Итог сделки копируется только из exact `ApprovedOfferSnapshot`; frontend не присылает total. Deposit переносится из Reservation в Payment ledger одной ссылочной записью и не считается выручкой второй раз. Полученные платежи и возвраты остаются неизменяемыми строками с tenant-wide command/manual-reference uniqueness; отмена с деньгами удерживает Vehicle в `SaleInProgress` до полного `Refunded`.
+
+Документы генерируются PDFsharp 6.2.4 (MIT, cross-platform .NET 10), содержат явную demo/non-legal маркировку и snapshot сделки. Бинарный PDF хранится в private MinIO, metadata содержит template version, revision link, SHA-256 и actor/time; скачивание идёт только через permission-checked API и отдельно аудируется. Linux image устанавливает DejaVu Sans для Unicode PDF.
+
 ## Дополнение 0.8: Reservations
 
 Модуль `Reservations` продолжает точный `ApprovedOfferSnapshot`, не копируя владение Offer из `Sales`. Создание брони и переход Vehicle `ReadyForSale → Reserved` сохраняются одной транзакцией. Partial unique index `(OrganizationId, VehicleId) WHERE Status IN (PendingDeposit, Active)` является окончательной защитой от двух клиентов; optimistic token обеспечивает согласованность extend/deposit/cancel/expire. Повтор create/command ID с тем же actor и payload идемпотентен, другой payload возвращает `409`.
@@ -33,6 +41,7 @@ React/Vite -> ASP.NET Core command endpoints -> application services -> aggregat
 - `CRM`: клиент, согласия и дедупликация; лид, назначение, SLA первого ответа, activity timeline и явные lifecycle-команды.
 - `Sales`: Visit, SalesOffer и ApprovedOfferSnapshot; серверные суммы, approval и неизменяемый коммерческий snapshot.
 - `Reservations`: временная бронь Approved Offer, ручной статус предоплаты, истечение и конкурентная блокировка Vehicle.
+- `Deals`: Deal snapshot, immutable payment/refund ledger, private document revisions и handover gate.
 - `SharedKernel`: только стабильные малые понятия и типы ошибок.
 - `apps/api/Infrastructure`: EF mappings по схемам `identity`, `organizations`, `vehicles`, `audit`; это адаптер, а не место бизнес-правил.
 

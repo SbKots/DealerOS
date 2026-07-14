@@ -1,5 +1,7 @@
 # Security baseline
 
+- Deal totals вычисляются из immutable Approved Offer snapshot; клиент не задаёт tenant, branch, customer, vehicle или финансовый total. Payment/Refund не содержит карты или банковских реквизитов, использует только безопасный manual reference и не копируется целиком в audit/logs. PDF хранится в private MinIO, скачивается через JWT+permission API и помечен как demo/non-legal; SHA-256 и template revision позволяют проверить неизменность.
+
 - Reservation не принимает tenant/branch/customer/vehicle из доверенного client context: они выводятся из exact Approved Offer snapshot. Активную бронь атомарно защищает tenant-aware partial unique index; race loser получает контролируемый 409. Manual deposit хранит только безопасную ссылку без карты/банковских реквизитов. Expiration worker освобождает Vehicle транзакционно и не может снять конкурентно преобразованную бронь.
 
 - Sales API не принимает tenant из запроса и повторно проверяет branch, Customer, Qualified Lead, Vehicle, Listing, execution и ответственного сотрудника. Composite tenant FK не позволяют связать записи разных организаций прямой записью в БД.

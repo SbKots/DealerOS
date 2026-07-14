@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SharedKernel\DealerOS.SharedKernel.csproj" />
+    <ProjectReference Include="..\IdentityAccess\DealerOS.Modules.IdentityAccess.csproj" />
+    <ProjectReference Include="..\Vehicles\DealerOS.Modules.Vehicles.csproj" />
+    <ProjectReference Include="..\Sales\DealerOS.Modules.Sales.csproj" />
+    <ProjectReference Include="..\Reservations\DealerOS.Modules.Reservations.csproj" />
+    <ProjectReference Include="..\Crm\DealerOS.Modules.Crm.csproj" />
+    <ProjectReference Include="..\Operations\DealerOS.Modules.Operations.csproj" />
+  </ItemGroup>
+</Project>

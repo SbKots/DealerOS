@@ -6,7 +6,7 @@ const image = (name: string) => ({
   buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
 })
 
-test('release train 0.4-0.8 moves an approved offer to a concurrent-safe reservation', async ({ page }) => {
+test('release train 0.4-0.9 moves an approved offer through reservation and deal to Sold', async ({ page }) => {
   test.setTimeout(420_000)
   const browserErrors: string[] = []
   page.on('pageerror', (error) => browserErrors.push(error.message))
@@ -126,6 +126,10 @@ test('release train 0.4-0.8 moves an approved offer to a concurrent-safe reserva
   await page.getByRole('button', { name: 'Проверить и сделать Listing Ready' }).click()
   await listingReady
   await expect(page.locator('.status').filter({ hasText: 'Listing Ready' })).toBeVisible()
+  await page.getByRole('button', { name: 'Manual export JSON' }).click()
+  await expect(page.locator('.snapshot-preview')).toBeVisible()
+  await page.getByRole('button', { name: 'Подтвердить Published вручную' }).click()
+  await expect(page.getByText(/demo-channel · Published/)).toBeVisible()
 
   await switchSession(page, managerSession)
   await navigate(page, 'Клиенты и лиды')
@@ -187,6 +191,27 @@ test('release train 0.4-0.8 moves an approved offer to a concurrent-safe reserva
   await expect(page.locator('.reservation-card')).toContainText(customer)
   await expect(page.locator('.reservation-card .status')).toContainText('Active')
   await expect(page.locator('.reservation-card .countdown')).toContainText(/ч .*мин/)
+
+  await navigate(page, 'Сделки')
+  const activeReservation = page.getByRole('option').filter({ hasText: customer })
+  const reservationId = await activeReservation.getAttribute('value')
+  expect(reservationId).toBeTruthy()
+  await page.getByLabel('Active Reservation для сделки').selectOption(reservationId!)
+  await page.getByRole('button', { name: 'Создать Deal snapshot' }).click()
+  await expect(page.locator('.deal-workspace .status')).toContainText('Draft')
+  await page.getByRole('button', { name: 'Перейти к оплате' }).click()
+  await page.getByRole('button', { name: 'Зарегистрировать оплату' }).click()
+  await expect(page.getByText('Payment · Received')).toBeVisible()
+  await page.getByRole('button', { name: 'Сформировать PDF' }).first().click()
+  await expect(page.getByRole('button', { name: 'Скачать PDF' })).toHaveCount(1)
+  await page.getByRole('button', { name: 'Сформировать PDF' }).click()
+  await expect(page.getByRole('button', { name: 'Скачать PDF' })).toHaveCount(2)
+  await page.getByRole('button', { name: 'Проверить готовность к выдаче' }).click()
+  await expect(page.locator('.deal-workspace .status')).toContainText('ReadyForHandover')
+  await page.getByRole('button', { name: 'Завершить checklist выдачи' }).click()
+  await page.getByRole('button', { name: 'Выдать автомобиль и завершить Deal' }).click()
+  await expect(page.getByText('Автомобиль продан')).toBeVisible()
+  await expect(page.locator('.deal-workspace .status')).toContainText('Completed')
   expect(browserErrors).toEqual([])
 })
 

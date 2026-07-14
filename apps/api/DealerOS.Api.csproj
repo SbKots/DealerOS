@@ -16,6 +16,7 @@
     <PackageReference Include="Minio" Version="7.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="NSwag.AspNetCore" Version="14.7.1" />
+    <PackageReference Include="PDFsharp" Version="6.2.4" />
     <PackageReference Include="SkiaSharp" Version="4.150.0" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.150.0" />
   </ItemGroup>
@@ -31,6 +32,7 @@
     <ProjectReference Include="..\..\modules\Crm\DealerOS.Modules.Crm.csproj" />
     <ProjectReference Include="..\..\modules\Sales\DealerOS.Modules.Sales.csproj" />
     <ProjectReference Include="..\..\modules\Reservations\DealerOS.Modules.Reservations.csproj" />
+    <ProjectReference Include="..\..\modules\Deals\DealerOS.Modules.Deals.csproj" />
   </ItemGroup>
 
 </Project>
