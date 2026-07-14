@@ -6,6 +6,7 @@ import type { Deal } from './Deals'
 import type { FinanceDashboard } from './Finance'
 import type { Reservation } from './Reservations'
 import type { Visit } from './Sales'
+import { VehicleCover } from './VehiclePhotoGallery'
 import { EmptyState, Icon, LoadingState, Money, PageHeader, VehicleVisual } from './ui'
 
 type DashboardView = 'intake' | 'inspections' | 'reconditioning' | 'operations' | 'quality-listings' | 'crm' | 'sales' | 'reservations' | 'deals' | 'finance'
@@ -63,7 +64,7 @@ export function Dashboard({ vehicles, loading, permissions, onNavigate, onSelect
     <div className="dashboard-grid">
       <section className="surface dashboard-attention">
         <div className="surface-heading"><div><span className="overline">Приоритет</span><h2>Автомобили, требующие действий</h2></div><button className="ghost-button" onClick={() => onNavigate('intake')}>Весь реестр <Icon name="chevron" size={15} /></button></div>
-        {loading ? <LoadingState /> : attention.length ? <div className="attention-list">{attention.slice(0, 5).map((vehicle) => <button key={vehicle.id} onClick={() => { onSelectVehicle(vehicle); onNavigate('intake') }}><VehicleVisual name={`${vehicle.make} ${vehicle.model}`} /><span><strong>{vehicle.make} {vehicle.model}</strong><small>{vehicle.year} · {vehicle.branchName}</small><code>{vehicle.vin}</code></span><StatusText status={vehicle.status} /><Icon name="chevron" size={17} /></button>)}</div> : <EmptyState icon="quality" title="Срочных действий нет" description="Новые задачи появятся здесь по мере движения автомобилей." />}
+        {loading ? <LoadingState /> : attention.length ? <div className="attention-list">{attention.slice(0, 5).map((vehicle) => <button key={vehicle.id} onClick={() => { onSelectVehicle(vehicle); onNavigate('intake') }}>{can('vehicles.photos.view') ? <VehicleCover compact vehicleId={vehicle.id} photoId={vehicle.coverPhotoId} name={`${vehicle.make} ${vehicle.model}`} /> : <VehicleVisual name={`${vehicle.make} ${vehicle.model}`} />}<span><strong>{vehicle.make} {vehicle.model}</strong><small>{vehicle.year} · {vehicle.branchName}</small><code>{vehicle.vin}</code></span><StatusText status={vehicle.status} /><Icon name="chevron" size={17} /></button>)}</div> : <EmptyState icon="quality" title="Срочных действий нет" description="Новые задачи появятся здесь по мере движения автомобилей." />}
       </section>
 
       <section className="surface dashboard-agenda">

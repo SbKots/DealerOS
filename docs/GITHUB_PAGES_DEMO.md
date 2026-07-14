@@ -18,8 +18,10 @@ The two modes share visual components and styles, but they have separate data so
 - All Pages data is synthetic and clearly marked as demonstration data.
 - No credentials, access tokens, personal data, or secrets are embedded in the static bundle.
 - Demo actions update React state only and reset on reload.
+- Vehicle card includes three generated synthetic inventory photos; cover, ordering, deletion and lightbox actions stay in browser memory only.
 - The Pages bundle contains no `/api/` request paths.
 - Navigation is state-based and does not create nested browser routes, so refresh always returns to `/DealerOS/` safely.
+- `public/404.html` redirects accidental nested Pages URLs back to `/DealerOS/`, so an old or copied deep link does not strand the viewer on GitHub's 404 page.
 
 ## Deployment
 

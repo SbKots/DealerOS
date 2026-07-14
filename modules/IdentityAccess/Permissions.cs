@@ -5,6 +5,9 @@ public static class Permissions
     public const string VehiclesRead = "vehicles.read";
     public const string VehiclesCreate = "vehicles.create";
     public const string VehiclesAccept = "vehicles.accept";
+    public const string VehiclesPhotosView = "vehicles.photos.view";
+    public const string VehiclesPhotosUpload = "vehicles.photos.upload";
+    public const string VehiclesPhotosManage = "vehicles.photos.manage";
     public const string VehicleInspectionsView = "vehicles.inspections.view";
     public const string VehicleInspectionsCreate = "vehicles.inspections.create";
     public const string VehicleInspectionsEdit = "vehicles.inspections.edit";
@@ -147,6 +150,9 @@ public static class Permissions
 
     public static readonly string[] ListingOperator =
     [
+        VehiclesPhotosView,
+        VehiclesPhotosUpload,
+        VehiclesPhotosManage,
         ListingsView,
         ListingsEdit,
         ListingsPublish

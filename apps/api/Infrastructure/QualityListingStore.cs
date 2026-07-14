@@ -61,12 +61,60 @@ public sealed class QualityListingStore(DealerOsDbContext dbContext) : IQualityL
         x => x.OrganizationId == organizationId && x.VehicleId == vehicleId).OrderBy(x => x.SortOrder)
         .ThenBy(x => x.CreatedAt).ToListAsync(cancellationToken);
 
+    public Task<int> CountMediaAsync(Guid organizationId, Guid vehicleId, CancellationToken cancellationToken) =>
+        dbContext.VehicleMedia.CountAsync(x => x.OrganizationId == organizationId && x.VehicleId == vehicleId,
+            cancellationToken);
+
+    public Task<InspectionMediaSource?> FindInspectionMediaSourceAsync(Guid organizationId, Guid vehicleId,
+        Guid inspectionPhotoId, CancellationToken cancellationToken) =>
+        (from photo in dbContext.InspectionPhotos.AsNoTracking()
+         join defect in dbContext.InspectionDefects.AsNoTracking()
+             on new { photo.OrganizationId, Id = photo.DefectId } equals new { defect.OrganizationId, defect.Id }
+         join inspection in dbContext.Inspections.AsNoTracking()
+             on new { defect.OrganizationId, Id = defect.InspectionId } equals new { inspection.OrganizationId, inspection.Id }
+         where photo.OrganizationId == organizationId && photo.Id == inspectionPhotoId
+             && inspection.VehicleId == vehicleId && inspection.Status == InspectionStatus.Completed
+         select new InspectionMediaSource(photo.Id, inspection.Id, defect.Id, inspection.VehicleId,
+             inspection.BranchId, defect.Title, photo.OriginalFileName, photo.ObjectKey, photo.ContentType,
+             photo.SizeBytes, photo.CreatedAt)).SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<InspectionMediaSourceResponse>> ListInspectionMediaSourcesAsync(
+        Guid organizationId, Guid vehicleId, IReadOnlySet<Guid> branchIds, CancellationToken cancellationToken) =>
+        await (from photo in dbContext.InspectionPhotos.AsNoTracking()
+               join defect in dbContext.InspectionDefects.AsNoTracking()
+                   on new { photo.OrganizationId, Id = photo.DefectId } equals new { defect.OrganizationId, defect.Id }
+               join inspection in dbContext.Inspections.AsNoTracking()
+                   on new { defect.OrganizationId, Id = defect.InspectionId } equals new { inspection.OrganizationId, inspection.Id }
+               where photo.OrganizationId == organizationId && inspection.VehicleId == vehicleId
+                   && branchIds.Contains(inspection.BranchId) && inspection.Status == InspectionStatus.Completed
+               orderby photo.CreatedAt descending
+               select new InspectionMediaSourceResponse(photo.Id, inspection.Id, defect.Id, defect.Title,
+                   photo.OriginalFileName, photo.CreatedAt,
+                   $"/api/inspections/{inspection.Id}/defects/{defect.Id}/photos/{photo.Id}"))
+            .ToListAsync(cancellationToken);
+
     public Task AddMediaAsync(VehicleMedia media, CancellationToken cancellationToken) =>
         dbContext.VehicleMedia.AddAsync(media, cancellationToken).AsTask();
 
-    public Task QueueObjectDeletionAsync(Guid organizationId, string objectKey, DateTimeOffset now,
-        CancellationToken cancellationToken) => dbContext.InspectionObjectDeletions
-        .AddAsync(new InspectionObjectDeletion(organizationId, objectKey, now), cancellationToken).AsTask();
+    public void RemoveMedia(VehicleMedia media) => dbContext.VehicleMedia.Remove(media);
+
+    public async Task QueueObjectDeletionAsync(Guid organizationId, string objectKey, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (!await dbContext.InspectionObjectDeletions.AnyAsync(x => x.OrganizationId == organizationId
+                && x.ObjectKey == objectKey, cancellationToken))
+            await dbContext.InspectionObjectDeletions.AddAsync(
+                new InspectionObjectDeletion(organizationId, objectKey, now), cancellationToken);
+    }
+
+    public Task CompleteObjectDeletionAsync(Guid organizationId, string objectKey,
+        CancellationToken cancellationToken) => dbContext.InspectionObjectDeletions.Where(
+        x => x.OrganizationId == organizationId && x.ObjectKey == objectKey).ExecuteDeleteAsync(cancellationToken);
+
+    public Task<bool> HasImmutableListingAsync(Guid organizationId, Guid vehicleId,
+        CancellationToken cancellationToken) => dbContext.ListingContents.AnyAsync(x =>
+        x.OrganizationId == organizationId && x.VehicleId == vehicleId && x.Status == ListingContentStatus.Ready,
+        cancellationToken);
 
     public Task<ListingContent?> FindListingAsync(Guid organizationId, Guid listingId,
         CancellationToken cancellationToken) => ListingQuery().SingleOrDefaultAsync(

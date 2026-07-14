@@ -65,6 +65,33 @@ export async function apiForm<T>(path: string, body: FormData): Promise<T> {
   return response.json() as Promise<T>
 }
 
+export function apiFormWithProgress<T>(path: string, body: FormData, onProgress: (percent: number) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest()
+    request.open('POST', path)
+    const token = getSession()?.accessToken
+    if (token) request.setRequestHeader('Authorization', `Bearer ${token}`)
+    request.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100))
+    })
+    request.addEventListener('load', () => {
+      if (request.status === 401) expireSession()
+      if (request.status < 200 || request.status >= 300) {
+        let problem: { title?: string; code?: string } = {}
+        try { problem = JSON.parse(request.responseText) as typeof problem } catch { /* non-JSON proxy error */ }
+        reject(new ApiError(problem.title ?? `Ошибка HTTP ${request.status}`, request.status, problem.code))
+        return
+      }
+      onProgress(100)
+      try { resolve((request.responseText ? JSON.parse(request.responseText) : null) as T) }
+      catch { reject(new ApiError('Сервер вернул некорректный ответ.', request.status)) }
+    })
+    request.addEventListener('error', () => reject(new ApiError('Не удалось загрузить файл. Проверьте соединение и повторите попытку.', 0)))
+    request.addEventListener('abort', () => reject(new ApiError('Загрузка отменена.', 0)))
+    request.send(body)
+  })
+}
+
 export async function apiBlob(path: string): Promise<Blob> {
   const response = await fetch(path, {
     headers: getSession()?.accessToken ? { Authorization: `Bearer ${getSession()!.accessToken}` } : {},

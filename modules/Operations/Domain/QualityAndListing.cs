@@ -5,7 +5,24 @@ namespace DealerOS.Modules.Operations.Domain;
 
 public enum QualityCheckStatus { Draft = 1, Passed = 2, ReworkRequired = 3, Rejected = 4 }
 public enum QualityObservationSeverity { Minor = 1, Major = 2, Critical = 3 }
-public enum VehicleMediaCategory { Exterior = 1, Interior = 2, DamageHistory = 3, DocumentsInternal = 4 }
+public enum VehicleMediaCategory
+{
+    MainView = 1,
+    Exterior = MainView,
+    Interior = 2,
+    Defect = 3,
+    DamageHistory = Defect,
+    Documents = 4,
+    DocumentsInternal = Documents,
+    Front = 5,
+    Rear = 6,
+    LeftSide = 7,
+    RightSide = 8,
+    Dashboard = 9,
+    Trunk = 10,
+    Engine = 11,
+    Other = 12
+}
 public enum ListingContentStatus { Draft = 1, Ready = 2 }
 public enum ChannelPublicationStatus { Draft = 1, Exported = 2, Published = 3, Failed = 4, Unpublished = 5 }
 
@@ -160,24 +177,58 @@ public sealed class VehicleMedia
     private VehicleMedia() { }
     public VehicleMedia(Guid id, Guid organizationId, Guid branchId, Guid vehicleId, VehicleMediaCategory category,
         string objectKey, string originalFileName, string contentType, long sizeBytes, int sortOrder,
-        Guid actorUserId, DateTimeOffset now)
+        Guid actorUserId, DateTimeOffset now) : this(id, organizationId, branchId, vehicleId, category, objectKey,
+        objectKey, objectKey, objectKey, originalFileName, contentType, sizeBytes, 1, 1, 1, 1, 1, 1, 1, 1,
+        null, true, sortOrder, actorUserId, now)
+    { }
+
+    public VehicleMedia(Guid id, Guid organizationId, Guid branchId, Guid vehicleId,
+        VehicleMediaCategory? category, string objectKey, string thumbnailObjectKey, string mediumObjectKey,
+        string largeObjectKey, string originalFileName, string contentType, long sizeBytes, int width, int height,
+        int thumbnailWidth, int thumbnailHeight, int mediumWidth, int mediumHeight, int largeWidth, int largeHeight,
+        Guid? sourceInspectionPhotoId, bool ownsOriginalObject, int sortOrder, Guid actorUserId, DateTimeOffset now)
     {
         if (sizeBytes <= 0) throw new DomainException("media.empty", "Пустой медиафайл недопустим.");
+        if (width <= 0 || height <= 0 || thumbnailWidth <= 0 || thumbnailHeight <= 0 || mediumWidth <= 0
+            || mediumHeight <= 0 || largeWidth <= 0 || largeHeight <= 0)
+            throw new DomainException("media.invalid_dimensions", "Размеры изображения должны быть положительными.");
         Id = id; OrganizationId = organizationId; BranchId = branchId; VehicleId = vehicleId; Category = category;
-        ObjectKey = objectKey; OriginalFileName = originalFileName; ContentType = contentType; SizeBytes = sizeBytes;
-        SortOrder = sortOrder; CreatedByUserId = actorUserId; CreatedAt = now; Version = 1;
+        ObjectKey = objectKey; ThumbnailObjectKey = thumbnailObjectKey; MediumObjectKey = mediumObjectKey;
+        LargeObjectKey = largeObjectKey; OriginalFileName = originalFileName; ContentType = contentType;
+        SizeBytes = sizeBytes; Width = width; Height = height; ThumbnailWidth = thumbnailWidth;
+        ThumbnailHeight = thumbnailHeight; MediumWidth = mediumWidth; MediumHeight = mediumHeight;
+        LargeWidth = largeWidth; LargeHeight = largeHeight; SourceInspectionPhotoId = sourceInspectionPhotoId;
+        OwnsOriginalObject = ownsOriginalObject; SortOrder = sortOrder; CreatedByUserId = actorUserId;
+        CreatedAt = now; IsIncludedInListing = category != VehicleMediaCategory.Documents; Version = 1;
     }
     public Guid Id { get; private set; }
     public Guid OrganizationId { get; private set; }
     public Guid BranchId { get; private set; }
     public Guid VehicleId { get; private set; }
-    public VehicleMediaCategory Category { get; private set; }
+    public VehicleMediaCategory? Category { get; private set; }
     public string ObjectKey { get; private set; } = string.Empty;
+    public string ThumbnailObjectKey { get; private set; } = string.Empty;
+    public string MediumObjectKey { get; private set; } = string.Empty;
+    public string LargeObjectKey { get; private set; } = string.Empty;
     public string OriginalFileName { get; private set; } = string.Empty;
     public string ContentType { get; private set; } = string.Empty;
     public long SizeBytes { get; private set; }
+    public int Width { get; private set; }
+    public int Height { get; private set; }
+    public int ThumbnailWidth { get; private set; }
+    public int ThumbnailHeight { get; private set; }
+    public int MediumWidth { get; private set; }
+    public int MediumHeight { get; private set; }
+    public int LargeWidth { get; private set; }
+    public int LargeHeight { get; private set; }
+    public string? Caption { get; private set; }
+    public decimal? FocalPointX { get; private set; }
+    public decimal? FocalPointY { get; private set; }
+    public Guid? SourceInspectionPhotoId { get; private set; }
+    public bool OwnsOriginalObject { get; private set; }
     public int SortOrder { get; private set; }
     public bool IsCover { get; private set; }
+    public bool IsIncludedInListing { get; private set; }
     public Guid CreatedByUserId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public long Version { get; private set; }
@@ -190,10 +241,41 @@ public sealed class VehicleMedia
     public void SetCover(bool value, long expectedVersion)
     {
         EnsureVersion(expectedVersion);
-        if (value && Category == VehicleMediaCategory.DocumentsInternal)
+        if (value && Category == VehicleMediaCategory.Documents)
             throw new DomainException("media.internal_cover", "Внутренний документ нельзя сделать обложкой.");
         IsCover = value; Version++;
     }
+
+    public void UpdateMetadata(VehicleMediaCategory? category, string? caption, decimal? focalPointX,
+        decimal? focalPointY, long expectedVersion)
+    {
+        EnsureVersion(expectedVersion);
+        var safeCaption = caption?.Trim();
+        if (safeCaption?.Length > 500)
+            throw new DomainException("media.caption_too_long", "Подпись не должна превышать 500 символов.");
+        if (focalPointX is < 0 or > 1 || focalPointY is < 0 or > 1
+            || (focalPointX is null) != (focalPointY is null))
+            throw new DomainException("media.invalid_focal_point",
+                "Точка кадрирования должна находиться внутри изображения.");
+        if (IsCover && category == VehicleMediaCategory.Documents)
+            throw new DomainException("media.internal_cover", "Документ нельзя сделать обложкой.");
+        Category = category; Caption = string.IsNullOrWhiteSpace(safeCaption) ? null : safeCaption;
+        FocalPointX = focalPointX; FocalPointY = focalPointY; Version++;
+    }
+
+    public void SetIncludedInListing(bool value, long expectedVersion)
+    {
+        EnsureVersion(expectedVersion);
+        if (value && Category == VehicleMediaCategory.Documents)
+            throw new DomainException("media.internal_listing", "Внутренний документ нельзя добавить в объявление.");
+        IsIncludedInListing = value; Version++;
+    }
+
+    public IReadOnlyList<string> OwnedObjectKeys() => OwnsOriginalObject
+        ? [ObjectKey, ThumbnailObjectKey, MediumObjectKey, LargeObjectKey]
+        : [ThumbnailObjectKey, MediumObjectKey, LargeObjectKey];
+
+    public void ValidateVersion(long expectedVersion) => EnsureVersion(expectedVersion);
     private void EnsureVersion(long expectedVersion)
     {
         if (Version != expectedVersion) throw new ConflictException("media.version_conflict", "Медиа изменено конкурентно.");

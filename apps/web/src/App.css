@@ -319,6 +319,81 @@ dd { overflow: hidden; margin: 4px 0 0; font-size: 10px; font-weight: 720; text-
 .vehicle-next-action strong { color: var(--green-dark); font-size: 10px; }
 .vehicle-next-action small { color: var(--muted); font-size: 8px; }
 .registry-search { display: flex; align-items: center; gap: 8px; padding: 8px 11px; border-radius: 8px; color: var(--muted); background: var(--green-softer); font-size: 9px; }
+.vehicle-cover { overflow: hidden; background: #eef2ef; }
+.vehicle-cover > img, .vehicle-cover > .photo-placeholder { width: 100%; height: 100%; border: 0; border-radius: inherit; }
+.vehicle-cover.compact { width: 58px; height: 44px; flex: 0 0 58px; border-radius: 8px; }
+.registry-vehicle-cell { min-width: 210px; display: flex; align-items: center; gap: 10px; }
+.registry-vehicle-cell > span { min-width: 0; }
+.attention-list .vehicle-cover.compact { width: 72px; height: 51px; flex-basis: 72px; border-radius: 9px; }
+
+/* Vehicle photo gallery */
+.vehicle-gallery-panel { margin: 18px 0; scroll-margin-top: calc(var(--topbar-height) + 12px); }
+.vehicle-gallery { display: grid; gap: 16px; }
+.gallery-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.gallery-heading h3 { margin: 4px 0; font-size: 20px; }
+.gallery-heading p { margin: 0; color: var(--muted); font-size: 9px; }
+.gallery-dropzone { display: grid; grid-template-columns: auto minmax(220px, 1fr) auto minmax(150px, .35fr); align-items: center; gap: 14px; min-height: 92px; padding: 14px 18px; border: 1px dashed #9db9a7; border-radius: 11px; color: var(--green); background: var(--green-softer); transition: border-color .15s, background .15s, transform .15s; }
+.gallery-dropzone.active { border-color: var(--green); background: #e5f3ea; transform: translateY(-1px); }
+.gallery-dropzone > span { min-width: 0; display: grid; gap: 4px; }
+.gallery-dropzone strong { color: var(--ink); font-size: 10px; }
+.gallery-dropzone small { color: var(--muted); font-size: 8px; }
+.gallery-dropzone > label { min-width: 0; display: grid; gap: 4px; color: var(--muted); font-size: 8px; }
+.gallery-dropzone > label.secondary { display: inline-flex; color: var(--green); cursor: pointer; }
+.gallery-dropzone input[type="file"] { display: none; }
+.upload-queue { display: grid; gap: 7px; }
+.upload-queue article { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto auto; align-items: center; gap: 11px; padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: white; }
+.upload-queue article.error { border-color: #e2b5b0; background: #fff9f8; }
+.upload-queue img { width: 64px; height: 48px; border-radius: 7px; object-fit: cover; }
+.upload-queue article > span { min-width: 0; display: grid; gap: 4px; }
+.upload-queue strong, .upload-queue small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upload-queue strong { font-size: 9px; }
+.upload-queue small { color: var(--muted); font-size: 8px; }
+.upload-queue article.error small { color: var(--red); white-space: normal; }
+.upload-queue i { height: 4px; overflow: hidden; border-radius: 99px; background: #dfe7e2; }
+.upload-queue i b { height: 100%; display: block; border-radius: inherit; background: var(--green); transition: width .15s; }
+.upload-dismiss { width: 27px; height: 27px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: 17px; }
+.inspection-photo-picker { display: grid; gap: 12px; padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: #f8faf8; }
+.inspection-photo-picker > div:first-child { display: grid; gap: 3px; }
+.inspection-photo-picker small { color: var(--muted); font-size: 8px; }
+.inspection-source-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 8px; }
+.inspection-source-grid article { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 9px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: white; }
+.inspection-source-grid img, .inspection-source-grid .photo-placeholder { width: 64px; height: 53px; grid-row: 1 / span 2; border-radius: 7px; object-fit: cover; }
+.inspection-source-grid span { min-width: 0; display: grid; gap: 3px; }
+.inspection-source-grid strong, .inspection-source-grid small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inspection-source-grid .secondary { grid-column: 2; justify-self: start; min-height: 29px; padding: 6px 9px; }
+.vehicle-photo-grid { display: grid; grid-template-columns: repeat(4, minmax(170px, 1fr)); gap: 11px; }
+.vehicle-photo-grid > article { min-width: 0; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: white; box-shadow: var(--shadow-xs); }
+.vehicle-photo-grid > article.cover { border-color: #73a989; box-shadow: 0 0 0 2px rgba(23,100,71,.09); }
+.vehicle-photo-grid > article[draggable="true"] { cursor: grab; }
+.photo-open { width: 100%; position: relative; display: block; overflow: hidden; padding: 0; border: 0; aspect-ratio: 4 / 3; background: #e9efeb; }
+.photo-open img, .photo-open > .photo-placeholder { width: 100%; height: 100%; border: 0; border-radius: 0; }
+.photo-badges { position: absolute; inset: 8px 8px auto; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.photo-badges b { padding: 4px 6px; border-radius: 5px; color: white; background: rgba(10,54,39,.88); font-size: 7px; letter-spacing: .04em; text-transform: uppercase; backdrop-filter: blur(5px); }
+.photo-card-copy { min-width: 0; display: grid; gap: 3px; padding: 10px; }
+.photo-card-copy strong, .photo-card-copy small, .photo-card-copy em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.photo-card-copy strong { font-size: 10px; }
+.photo-card-copy small, .photo-card-copy em { color: var(--muted); font-size: 8px; }
+.photo-card-copy em { font-style: normal; }
+.photo-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; padding: 0 9px 9px; }
+.photo-actions button { min-height: 27px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: white; font-size: 7px; font-weight: 750; }
+.photo-actions button:hover, .photo-actions button.selected { border-color: var(--green); color: var(--green); background: var(--green-softer); }
+.photo-actions button.danger:hover { border-color: #dba8a4; color: var(--red); background: #fff6f5; }
+.photo-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.photo-editor { display: grid; gap: 9px; padding: 11px; border-top: 1px solid var(--line); background: #f7f9f7; }
+.photo-editor > label { display: grid; gap: 4px; color: var(--muted); font-size: 8px; }
+.photo-editor > div:last-child { display: flex; align-items: center; gap: 9px; }
+.focal-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.focal-controls label { display: grid; gap: 2px; color: var(--muted); font-size: 8px; }
+.gallery-lightbox { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 40px 80px; color: white; background: rgba(4,17,12,.94); backdrop-filter: blur(10px); }
+.lightbox-content { width: min(1180px, 100%); height: min(78vh, 820px); display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 12px; }
+.lightbox-content > img, .lightbox-content > .photo-placeholder { width: 100%; height: 100%; min-height: 0; border: 0; border-radius: 9px; background: rgba(255,255,255,.03); }
+.lightbox-content > span { display: grid; gap: 3px; text-align: center; }
+.lightbox-content small { color: #c5d2cc; }
+.lightbox-close, .lightbox-prev, .lightbox-next { position: fixed; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; color: white; background: rgba(255,255,255,.08); }
+.lightbox-close { top: 22px; right: 24px; width: 40px; height: 40px; font-size: 25px; }
+.lightbox-prev, .lightbox-next { top: 50%; width: 46px; height: 46px; margin-top: -23px; font-size: 34px; }
+.lightbox-prev { left: 22px; }
+.lightbox-next { right: 22px; }
 
 /* Tables */
 .table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; scrollbar-width: thin; }
@@ -587,6 +662,8 @@ td.numeric, th.numeric { text-align: right; font-variant-numeric: tabular-nums; 
   .plan-heading { display: grid; }
   .budget-cards { flex-wrap: wrap; }
   .revision-comparison { align-items: flex-start; flex-direction: column; }
+  .vehicle-photo-grid { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
+  .inspection-source-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
 }
 
 @media (max-width: 900px) {
@@ -625,6 +702,9 @@ td.numeric, th.numeric { text-align: right; font-variant-numeric: tabular-nums; 
   .economics > div:nth-child(2n) { border-right: 0; }
   .finance-overview article { grid-template-columns: 54px repeat(4, minmax(120px, 1fr)); overflow-x: auto; }
   .inspection-footer { position: static; }
+  .gallery-dropzone { grid-template-columns: auto minmax(180px, 1fr) auto; }
+  .gallery-dropzone > label:last-child { grid-column: 2 / -1; }
+  .vehicle-photo-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
 }
 
 @media (max-width: 700px) {
@@ -647,6 +727,7 @@ td.numeric, th.numeric { text-align: right; font-variant-numeric: tabular-nums; 
   .deal-list > button, .reservation-list > button, .calendar-list > button, .offer-list > button { grid-template-columns: 1fr; }
   .payment-timeline article { grid-template-columns: 1fr; }
   .payment-timeline small { grid-column: auto; }
+  .inspection-source-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 580px) {
@@ -706,6 +787,18 @@ td.numeric, th.numeric { text-align: right; font-variant-numeric: tabular-nums; 
   .finance-filters { align-items: stretch; flex-direction: column; }
   .finance-filters label { min-width: 0; }
   .source-grid, .finance-metrics { grid-template-columns: 1fr; }
+  .gallery-heading { align-items: flex-start; flex-direction: column; }
+  .gallery-dropzone { grid-template-columns: auto minmax(0, 1fr); padding: 14px; }
+  .gallery-dropzone > label { grid-column: 1 / -1; width: 100%; }
+  .gallery-dropzone > label.secondary { justify-content: center; }
+  .vehicle-photo-grid { grid-template-columns: 1fr; }
+  .upload-queue article { grid-template-columns: 54px minmax(0, 1fr) auto; }
+  .upload-queue img { width: 54px; height: 44px; }
+  .upload-queue .link-button { grid-column: 2; justify-self: start; }
+  .gallery-lightbox { padding: 58px 12px 30px; }
+  .lightbox-prev, .lightbox-next { top: auto; bottom: 24px; }
+  .lightbox-prev { left: 18px; }
+  .lightbox-next { right: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

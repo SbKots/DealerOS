@@ -14,7 +14,8 @@ import { QualityListingsWorkspace } from './QualityListings'
 import { ReconditioningWorkspace } from './Reconditioning'
 import { ReservationsWorkspace } from './Reservations'
 import { SalesWorkspace } from './Sales'
-import { AppLogo, EmptyState, Icon, type IconName, PageHeader, VehicleJourney, VehicleVisual } from './ui'
+import { VehicleCover, VehiclePhotoGallery } from './VehiclePhotoGallery'
+import { AppLogo, EmptyState, Icon, type IconName, PageHeader, VehicleJourney } from './ui'
 import './App.css'
 
 const intakeSchema = z.object({
@@ -34,7 +35,7 @@ export type Branch = { id: string; code: string; name: string }
 export type Vehicle = {
   id: string; branchId: string; branchName: string; vin: string; make: string; model: string; year: number
   mileageKm: number; plannedPurchaseAmount: number; currency: string; status: 'IntakeDraft' | 'InStock' | 'InspectionInProgress' | 'ReconditioningRequired' | 'InspectionPassed' | 'ReadyForSale' | 'Reserved' | 'SaleInProgress' | 'Sold'
-  stockNumber?: string; createdAt: string; acceptedAt?: string; version: number
+  stockNumber?: string; coverPhotoId?: string; createdAt: string; acceptedAt?: string; version: number
 }
 
 type View = 'dashboard' | 'intake' | 'inspections' | 'reconditioning' | 'operations' | 'quality-listings' | 'crm' | 'sales' | 'reservations' | 'deals' | 'finance'
@@ -90,6 +91,12 @@ export default function App() {
   useEffect(() => {
     if (branches.data?.length && !form.getValues('branchId')) form.setValue('branchId', branches.data[0].id, { shouldValidate: true })
   }, [branches.data, form])
+
+  useEffect(() => {
+    if (!selected?.id) return
+    const refreshed = vehicles.data?.find((vehicle) => vehicle.id === selected.id)
+    if (refreshed && refreshed !== selected) setSelected(refreshed)
+  }, [vehicles.data, selected])
 
   useEffect(() => {
     const handleExpiredSession = () => {
@@ -153,6 +160,9 @@ export default function App() {
   const canCreate = permissionAllows('vehicles.create')
   const canAccept = permissionAllows('vehicles.accept')
   const canInspect = permissionAllows('vehicles.inspections.view')
+  const canViewPhotos = permissionAllows('vehicles.photos.view')
+  const canUploadPhotos = permissionAllows('vehicles.photos.upload')
+  const canManagePhotos = permissionAllows('vehicles.photos.manage')
   const navigate = (next: View) => { if (next === 'inspections') setInspectionVehicle(null); setView(next); setMobileMenuOpen(false) }
   const logout = () => { clearSession(); setView('dashboard'); setAuthenticated(false); setMobileMenuOpen(false); queryClient.clear() }
 
@@ -182,15 +192,15 @@ export default function App() {
                       : view === 'reservations' ? <ReservationsWorkspace />
                         : view === 'deals' ? <DealsWorkspace />
                           : view === 'finance' ? <FinanceWorkspace />
-                            : <IntakeWorkspace branches={branches.data ?? []} branchesLoading={branches.isLoading} vehicles={vehicles.data ?? []} vehiclesLoading={vehicles.isLoading} currentVehicle={currentVehicle} selectedId={selected?.id} form={form} canCreate={canCreate} canAccept={canAccept} canInspect={canInspect} createVehicle={createVehicle} acceptVehicle={acceptVehicle} onSelect={setSelected} onOpenInspections={(vehicle) => { setInspectionVehicle(vehicle); setView('inspections') }} errors={branches.error ?? vehicles.error} />}
+                            : <IntakeWorkspace branches={branches.data ?? []} branchesLoading={branches.isLoading} vehicles={vehicles.data ?? []} vehiclesLoading={vehicles.isLoading} currentVehicle={currentVehicle} selectedId={selected?.id} form={form} canCreate={canCreate} canAccept={canAccept} canInspect={canInspect} canViewPhotos={canViewPhotos} canUploadPhotos={canUploadPhotos} canManagePhotos={canManagePhotos} createVehicle={createVehicle} acceptVehicle={acceptVehicle} onSelect={setSelected} onOpenInspections={(vehicle) => { setInspectionVehicle(vehicle); setView('inspections') }} errors={branches.error ?? vehicles.error} />}
       </main>
     </div>
   </div>
 }
 
-function IntakeWorkspace({ branches, branchesLoading, vehicles, vehiclesLoading, currentVehicle, selectedId, form, canCreate, canAccept, canInspect, createVehicle, acceptVehicle, onSelect, onOpenInspections, errors }: {
+function IntakeWorkspace({ branches, branchesLoading, vehicles, vehiclesLoading, currentVehicle, selectedId, form, canCreate, canAccept, canInspect, canViewPhotos, canUploadPhotos, canManagePhotos, createVehicle, acceptVehicle, onSelect, onOpenInspections, errors }: {
   branches: Branch[]; branchesLoading: boolean; vehicles: Vehicle[]; vehiclesLoading: boolean; currentVehicle: Vehicle | null; selectedId?: string
-  form: ReturnType<typeof useForm<IntakeInput, unknown, IntakeForm>>; canCreate: boolean; canAccept: boolean; canInspect: boolean
+  form: ReturnType<typeof useForm<IntakeInput, unknown, IntakeForm>>; canCreate: boolean; canAccept: boolean; canInspect: boolean; canViewPhotos: boolean; canUploadPhotos: boolean; canManagePhotos: boolean
   createVehicle: ReturnType<typeof useMutation<Vehicle, Error, IntakeForm>>; acceptVehicle: ReturnType<typeof useMutation<Vehicle, Error, string>>
   onSelect: (vehicle: Vehicle) => void; onOpenInspections: (vehicle: Vehicle) => void; errors: unknown
 }) {
@@ -219,16 +229,18 @@ function IntakeWorkspace({ branches, branchesLoading, vehicles, vehiclesLoading,
       </section>
     </div>
 
+    {currentVehicle && canViewPhotos && <section className="panel vehicle-gallery-panel"><VehiclePhotoGallery vehicleId={currentVehicle.id} canUpload={canUploadPhotos} canManage={canManagePhotos} /></section>}
+
     <section className="registry vehicle-registry">
       <div className="registry-heading"><div><p className="eyebrow">Автопарк</p><h2>Реестр автомобилей</h2><p className="muted">{vehicles.length} автомобилей в доступных филиалах</p></div><div className="registry-search"><Icon name="search" size={17} /><span>Выберите автомобиль в таблице</span></div></div>
-      {vehiclesLoading ? <div className="loading-state" role="status"><span className="spinner" />Загружаем реестр…</div> : vehicles.length === 0 ? <EmptyState title="Реестр пока пуст" description="Первый автомобиль появится после создания поступления." /> : <div className="table-wrap"><table><thead><tr><th>Автомобиль</th><th>VIN</th><th>Филиал</th><th className="numeric">Цена закупки</th><th>Статус</th><th aria-label="Открыть" /></tr></thead><tbody>{vehicles.map((vehicle) => <tr key={vehicle.id} className={selectedId === vehicle.id ? 'selected' : ''} onClick={() => onSelect(vehicle)}><td><strong>{vehicle.make} {vehicle.model}</strong><small>{vehicle.year} · {vehicle.mileageKm.toLocaleString('ru-RU')} км</small></td><td className="mono">{vehicle.vin}</td><td>{vehicle.branchName}</td><td className="numeric">{vehicle.plannedPurchaseAmount.toLocaleString('ru-RU')} ₽</td><td><Status status={vehicle.status} /></td><td><button className="table-row-action" aria-label={`Открыть ${vehicle.make} ${vehicle.model}`} onClick={(event) => { event.stopPropagation(); onSelect(vehicle) }}><Icon name="chevron" size={16} /></button></td></tr>)}</tbody></table></div>}
+      {vehiclesLoading ? <div className="loading-state" role="status"><span className="spinner" />Загружаем реестр…</div> : vehicles.length === 0 ? <EmptyState title="Реестр пока пуст" description="Первый автомобиль появится после создания поступления." /> : <div className="table-wrap"><table><thead><tr><th>Автомобиль</th><th>VIN</th><th>Филиал</th><th className="numeric">Цена закупки</th><th>Статус</th><th aria-label="Открыть" /></tr></thead><tbody>{vehicles.map((vehicle) => <tr key={vehicle.id} className={selectedId === vehicle.id ? 'selected' : ''} onClick={() => onSelect(vehicle)}><td><div className="registry-vehicle-cell"><VehicleCover compact vehicleId={vehicle.id} photoId={vehicle.coverPhotoId} name={`${vehicle.make} ${vehicle.model}`} /><span><strong>{vehicle.make} {vehicle.model}</strong><small>{vehicle.year} · {vehicle.mileageKm.toLocaleString('ru-RU')} км</small></span></div></td><td className="mono">{vehicle.vin}</td><td>{vehicle.branchName}</td><td className="numeric">{vehicle.plannedPurchaseAmount.toLocaleString('ru-RU')} ₽</td><td><Status status={vehicle.status} /></td><td><button className="table-row-action" aria-label={`Открыть ${vehicle.make} ${vehicle.model}`} onClick={(event) => { event.stopPropagation(); onSelect(vehicle) }}><Icon name="chevron" size={16} /></button></td></tr>)}</tbody></table></div>}
     </section>
   </>
 }
 
 function VehicleCard({ vehicle, accepting, canAccept, canInspect, onAccept, onOpenInspections, error }: { vehicle: Vehicle; accepting: boolean; canAccept: boolean; canInspect: boolean; onAccept: () => void; onOpenInspections: () => void; error: unknown }) {
   return <div className="vehicle-card">
-    <VehicleVisual name={`${vehicle.make} ${vehicle.model}`} />
+    <VehicleCover vehicleId={vehicle.id} photoId={vehicle.coverPhotoId} name={`${vehicle.make} ${vehicle.model}`} />
     <div className="vehicle-card-top"><Status status={vehicle.status} /><span className="stock-number">{vehicle.stockNumber ?? 'Номер после приёмки'}</span></div>
     <div className="vehicle-identity"><h3>{vehicle.make} {vehicle.model}</h3><p>{vehicle.year} · {vehicle.mileageKm.toLocaleString('ru-RU')} км</p><code>{vehicle.vin}</code></div>
     <dl><div><dt>Закупка</dt><dd>{vehicle.plannedPurchaseAmount.toLocaleString('ru-RU')} ₽</dd></div><div><dt>Филиал</dt><dd>{vehicle.branchName}</dd></div><div><dt>Год</dt><dd>{vehicle.year}</dd></div><div><dt>Пробег</dt><dd>{vehicle.mileageKm.toLocaleString('ru-RU')} км</dd></div></dl>
