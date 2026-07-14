@@ -12,6 +12,22 @@ DealerOS — операционная система среднего автос
 docker compose up --build
 ```
 
+## GitHub Pages visual demo
+
+The Pages build is a separate frontend-only mode with synthetic data. It does not call the .NET API and does not replace the default Docker/API mode.
+
+```powershell
+cd apps/web
+npm ci
+npm run build:pages
+```
+
+`build:pages` loads `apps/web/.env.pages`, which sets `VITE_DEMO_MODE=true` and `VITE_BASE_PATH=/DealerOS/`. The generated static site is written to `apps/web/dist`. UI changes made in this mode live only in browser memory and may reset after a refresh.
+
+After the workflow is available on `master`, `.github/workflows/pages.yml` deploys the visual demo to `https://sbkots.github.io/DealerOS/`. GitHub Pages must use **GitHub Actions** as its build source.
+
+The safety boundary and deployment contract are documented in [docs/GITHUB_PAGES_DEMO.md](docs/GITHUB_PAGES_DEMO.md).
+
 Откройте [http://localhost:4173](http://localhost:4173). Демо-пользователь:
 
 - email: `admin@volga-auto.demo`
