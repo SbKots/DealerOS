@@ -6,7 +6,7 @@ const image = (name: string) => ({
   buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
 })
 
-test('release train 0.4-0.7 moves a prepared vehicle to an immutable approved offer', async ({ page }) => {
+test('release train 0.4-0.8 moves an approved offer to a concurrent-safe reservation', async ({ page }) => {
   test.setTimeout(420_000)
   const browserErrors: string[] = []
   page.on('pageerror', (error) => browserErrors.push(error.message))
@@ -177,6 +177,16 @@ test('release train 0.4-0.7 moves a prepared vehicle to an immutable approved of
   await page.getByRole('button', { name: 'Утвердить Offer' }).click()
   await expect(page.getByText('Immutable Approved Offer')).toBeVisible()
   await expect(page.locator('.offer-card .status')).toContainText('Approved')
+
+  await navigate(page, 'Брони')
+  const approvedOption = page.getByRole('option').filter({ hasText: customer })
+  const approvedSnapshotId = await approvedOption.getAttribute('value')
+  expect(approvedSnapshotId).toBeTruthy()
+  await page.getByLabel('Approved Offer для брони').selectOption(approvedSnapshotId!)
+  await page.getByRole('button', { name: 'Создать бронь' }).click()
+  await expect(page.locator('.reservation-card')).toContainText(customer)
+  await expect(page.locator('.reservation-card .status')).toContainText('Active')
+  await expect(page.locator('.reservation-card .countdown')).toContainText(/ч .*мин/)
   expect(browserErrors).toEqual([])
 })
 

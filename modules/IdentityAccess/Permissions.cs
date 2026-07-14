@@ -47,6 +47,22 @@ public static class Permissions
     public const string SalesOffersAutoApprove = "sales.offers.auto_approve";
     public const string SalesOffersApprove = "sales.offers.approve";
     public const string SalesOffersCancel = "sales.offers.cancel";
+    public const string ReservationsView = "reservations.view";
+    public const string ReservationsCreate = "reservations.create";
+    public const string ReservationsEdit = "reservations.edit";
+    public const string ReservationsExtend = "reservations.extend";
+    public const string ReservationsCancel = "reservations.cancel";
+    public const string ReservationsDeposit = "reservations.deposit";
+
+    public static readonly string[] ReservationOperator =
+    [
+        ReservationsView,
+        ReservationsCreate,
+        ReservationsEdit,
+        ReservationsExtend,
+        ReservationsCancel,
+        ReservationsDeposit
+    ];
 
     public static readonly string[] SalesOperator =
     [
@@ -59,14 +75,16 @@ public static class Permissions
         SalesOffersEdit,
         SalesOffersSubmit,
         SalesOffersAutoApprove,
-        SalesOffersCancel
+        SalesOffersCancel,
+        .. ReservationOperator
     ];
 
     public static readonly string[] SalesManager =
     [
         SalesVisitsView,
         SalesOffersView,
-        SalesOffersApprove
+        SalesOffersApprove,
+        ReservationsView
     ];
 
     public static readonly string[] CrmOperator =

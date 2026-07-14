@@ -1,8 +1,8 @@
 # DealerOS
 
-> Текущий сквозной релиз 0.7 добавляет визиты и test drive, серверный расчёт предложения, контроль скидки и маржи, независимое согласование и неизменяемый snapshot утверждённого Offer. Подробности: [docs/ITERATION_0.7.md](docs/ITERATION_0.7.md).
+> Текущий сквозной релиз 0.8 продолжает неизменяемый Approved Offer конкурентно безопасной временной бронью, ручной demo-предоплатой и автоматическим освобождением автомобиля по сроку.
 
-DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.7 связывает подготовленный автомобиль и квалифицированный лид с визитом, test drive и экономически контролируемым утверждённым предложением.
+DealerOS — операционная система среднего автосалона автомобилей с пробегом. Итерация 0.8 не позволяет одновременно обещать один готовый автомобиль двум клиентам: активная бронь защищена PostgreSQL и переводит автомобиль в `Reserved`.
 
 ## Быстрый запуск
 
@@ -46,6 +46,7 @@ API в Development применяет миграции и идемпотентн
 - `ObjectStorage__Endpoint`, `AccessKey`, `SecretKey`, `Bucket`, `UseSsl` — приватное S3-compatible хранилище фотографий;
 - `ObjectStorage__EnsureBucket` — создание bucket при старте только для Development/тестов.
 - `Operations__DeadlineWorkerEnabled`, `Operations__DeadlineWorkerIntervalMinutes` — фоновый tenant-aware контроль близких и просроченных сроков работ.
+- `Reservations__ExpirationWorkerEnabled`, `Reservations__ExpirationWorkerIntervalSeconds` — идемпотентное освобождение истёкших броней.
 
 Диагностика: `/health/live` проверяет процесс, `/health/ready` — PostgreSQL и object storage, `/health` сохранён как совмещённая проверка.
 

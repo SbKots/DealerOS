@@ -1,5 +1,7 @@
 # Security baseline
 
+- Reservation не принимает tenant/branch/customer/vehicle из доверенного client context: они выводятся из exact Approved Offer snapshot. Активную бронь атомарно защищает tenant-aware partial unique index; race loser получает контролируемый 409. Manual deposit хранит только безопасную ссылку без карты/банковских реквизитов. Expiration worker освобождает Vehicle транзакционно и не может снять конкурентно преобразованную бронь.
+
 - Sales API не принимает tenant из запроса и повторно проверяет branch, Customer, Qualified Lead, Vehicle, Listing, execution и ответственного сотрудника. Composite tenant FK не позволяют связать записи разных организаций прямой записью в БД.
 - Для test drive хранится только boolean подтверждения проверки водительских документов. Сканы и полный номер документа отсутствуют в HTTP-контрактах, домене, БД, audit и логах.
 - Offer принимает только положительные прозрачные строки и неотрицательную скидку; итог, себестоимость и маржа рассчитываются сервером. Утверждённый snapshot неизменяем, self-approval запрещён, решения защищены ID и optimistic concurrency.

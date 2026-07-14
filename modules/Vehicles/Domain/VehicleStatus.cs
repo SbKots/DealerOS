@@ -7,5 +7,8 @@ public enum VehicleStatus
     InspectionInProgress = 3,
     ReconditioningRequired = 4,
     InspectionPassed = 5,
-    ReadyForSale = 6
+    ReadyForSale = 6,
+    Reserved = 7,
+    SaleInProgress = 8,
+    Sold = 9
 }

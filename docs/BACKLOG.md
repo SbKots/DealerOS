@@ -1,5 +1,16 @@
 # Backlog
 
+## Готово в коде — итерация 0.8
+
+- бронь только из действующего актуального Approved Offer snapshot;
+- явные `PendingDeposit/Active/Expired/Cancelled/DepositFailed/ConvertedToDeal` и статусы предоплаты;
+- атомарный `ReadyForSale → Reserved`, partial unique index и PostgreSQL race двух клиентов;
+- отдельные idempotent команды deposit/extend/cancel/expire, optimistic concurrency и audit;
+- tenant/branch/permission isolation, application expiration worker, очередь и таймер во frontend;
+- unit, PostgreSQL integration, component и сквозной Playwright сценарии.
+
+Следующий checkpoint: Deal snapshot, immutable Payment ledger, private demo PDFs, возврат и выдача автомобиля.
+
 ## Готово в коде — итерация 0.7
 
 - календарь визитов, reschedule/arrival/result и безопасный test-drive check-out/check-in;
@@ -64,9 +75,8 @@
 
 ## Следующая продуктовая граница
 
-1. Временная бронь с конкурентной защитой и истечением.
-2. Deal snapshot, оплата, договоры и выдача.
-3. Итоговая экономика plan/fact по завершённой продаже.
+1. Deal snapshot, оплата, договоры и выдача.
+2. Итоговая экономика plan/fact по завершённой продаже.
 
 ## Позже по MVP
 

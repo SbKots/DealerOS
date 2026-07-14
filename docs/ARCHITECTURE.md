@@ -1,5 +1,11 @@
 # Архитектура
 
+## Дополнение 0.8: Reservations
+
+Модуль `Reservations` продолжает точный `ApprovedOfferSnapshot`, не копируя владение Offer из `Sales`. Создание брони и переход Vehicle `ReadyForSale → Reserved` сохраняются одной транзакцией. Partial unique index `(OrganizationId, VehicleId) WHERE Status IN (PendingDeposit, Active)` является окончательной защитой от двух клиентов; optimistic token обеспечивает согласованность extend/deposit/cancel/expire. Повтор create/command ID с тем же actor и payload идемпотентен, другой payload возвращает `409`.
+
+Expiration worker использует существующий application-worker pattern и `TimeProvider`: он tenant-aware выбирает только просроченные активные брони, идемпотентно закрывает их и освобождает Vehicle только в той же транзакции. `Reserved` блокирует новые Visit/TestDrive/Offer, потому что Sales принимает только `ReadyForSale`. Предоплата 0.8 является явно ручным demo-фактом; неизменяемый Payment ledger принадлежит checkpoint 0.9.
+
 ## Дополнение 0.7: Sales
 
 Модуль `Sales` владеет агрегатами `Visit` и `SalesOffer`, их историями, решениями и `ApprovedOfferSnapshot`. Application service читает проверенные проекции CRM, Vehicle, Listing и Operations через порт, но изменяет только таблицы схемы `sales`. PostgreSQL composite FK сохраняют tenant integrity, optimistic tokens защищают команды, а GiST exclusion constraints атомарно запрещают пересечение активных слотов менеджера и test-drive автомобиля. Публичная цена и подтверждённая себестоимость копируются в Offer как финансовый snapshot; последующие изменения источников не переписывают утверждённое предложение.
@@ -25,6 +31,8 @@ React/Vite -> ASP.NET Core command endpoints -> application services -> aggregat
 - `Reconditioning`: агрегат плана, работы, исключения обязательных дефектов, решения, бюджетные snapshots и ревизии.
 - `Operations`: исполнение утверждённого snapshot, заказ-работы, материалы, фактические расходы, перерасход, сроки и состояние расчёта с подрядчиком.
 - `CRM`: клиент, согласия и дедупликация; лид, назначение, SLA первого ответа, activity timeline и явные lifecycle-команды.
+- `Sales`: Visit, SalesOffer и ApprovedOfferSnapshot; серверные суммы, approval и неизменяемый коммерческий snapshot.
+- `Reservations`: временная бронь Approved Offer, ручной статус предоплаты, истечение и конкурентная блокировка Vehicle.
 - `SharedKernel`: только стабильные малые понятия и типы ошибок.
 - `apps/api/Infrastructure`: EF mappings по схемам `identity`, `organizations`, `vehicles`, `audit`; это адаптер, а не место бизнес-правил.
 

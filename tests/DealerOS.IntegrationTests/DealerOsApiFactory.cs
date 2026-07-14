@@ -4,10 +4,12 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DealerOS.IntegrationTests;
 
-public sealed class DealerOsApiFactory(string connectionString, string? objectStorageEndpoint = null) : WebApplicationFactory<Program>
+public sealed class DealerOsApiFactory(string connectionString, string? objectStorageEndpoint = null,
+    TimeProvider? timeProvider = null) : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -27,6 +29,12 @@ public sealed class DealerOsApiFactory(string connectionString, string? objectSt
             ["ObjectStorage:UseSsl"] = "false",
             ["ObjectStorage:EnsureBucket"] = objectStorageEndpoint is null ? "false" : "true"
         }));
+        if (timeProvider is not null)
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(timeProvider);
+            });
     }
 
     public async Task<int> CountAuditEventsAsync(Guid organizationId, Guid entityId)

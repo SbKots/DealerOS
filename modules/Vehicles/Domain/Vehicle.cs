@@ -115,6 +115,42 @@ public sealed class Vehicle
         TransitionTo(VehicleStatus.ReadyForSale, now, actorUserId);
     }
 
+    public void Reserve(DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status != VehicleStatus.ReadyForSale)
+            throw new DomainException("vehicle.reservation_requires_ready_for_sale",
+                "Забронировать можно только готовый к продаже автомобиль.");
+        TransitionTo(VehicleStatus.Reserved, now, actorUserId);
+    }
+
+    public void ReleaseReservation(DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status != VehicleStatus.Reserved)
+            throw new DomainException("vehicle.reservation_not_active", "У автомобиля нет активной брони.");
+        TransitionTo(VehicleStatus.ReadyForSale, now, actorUserId);
+    }
+
+    public void BeginSale(DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status != VehicleStatus.Reserved)
+            throw new DomainException("vehicle.sale_requires_reservation", "Сделка требует активной брони.");
+        TransitionTo(VehicleStatus.SaleInProgress, now, actorUserId);
+    }
+
+    public void CancelSale(DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status != VehicleStatus.SaleInProgress)
+            throw new DomainException("vehicle.sale_not_active", "У автомобиля нет активной сделки.");
+        TransitionTo(VehicleStatus.ReadyForSale, now, actorUserId);
+    }
+
+    public void CompleteSale(DateTimeOffset now, Guid actorUserId)
+    {
+        if (Status != VehicleStatus.SaleInProgress)
+            throw new DomainException("vehicle.sale_not_active", "Завершить можно только активную сделку.");
+        TransitionTo(VehicleStatus.Sold, now, actorUserId);
+    }
+
     private void TransitionTo(VehicleStatus next, DateTimeOffset now, Guid actorUserId)
     {
         var previous = Status;

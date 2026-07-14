@@ -9,6 +9,7 @@ using DealerOS.Modules.IdentityAccess;
 using DealerOS.Modules.Inspections.Application;
 using DealerOS.Modules.Operations.Application;
 using DealerOS.Modules.Reconditioning.Application;
+using DealerOS.Modules.Reservations.Application;
 using DealerOS.Modules.Sales.Application;
 using DealerOS.Modules.Vehicles.Application;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -84,7 +85,11 @@ builder.Services.AddScoped<CrmService>();
 builder.Services.AddScoped<SalesStore>();
 builder.Services.AddScoped<ISalesStore>(sp => sp.GetRequiredService<SalesStore>());
 builder.Services.AddScoped<SalesService>();
+builder.Services.AddScoped<ReservationStore>();
+builder.Services.AddScoped<IReservationStore>(sp => sp.GetRequiredService<ReservationStore>());
+builder.Services.AddScoped<ReservationService>();
 builder.Services.AddHostedService<OperationsDeadlineWorker>();
+builder.Services.AddHostedService<ReservationExpirationWorker>();
 builder.Services.AddSingleton<IMinioClient>(_ =>
 {
     var endpoint = builder.Configuration["ObjectStorage:Endpoint"]
@@ -197,6 +202,7 @@ app.MapOperationsEndpoints();
 app.MapQualityListingEndpoints();
 app.MapCrmEndpoints();
 app.MapSalesEndpoints();
+app.MapReservationEndpoints();
 app.Run();
 
 public partial class Program;

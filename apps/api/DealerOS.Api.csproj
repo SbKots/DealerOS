@@ -30,6 +30,7 @@
     <ProjectReference Include="..\..\modules\Operations\DealerOS.Modules.Operations.csproj" />
     <ProjectReference Include="..\..\modules\Crm\DealerOS.Modules.Crm.csproj" />
     <ProjectReference Include="..\..\modules\Sales\DealerOS.Modules.Sales.csproj" />
+    <ProjectReference Include="..\..\modules\Reservations\DealerOS.Modules.Reservations.csproj" />
   </ItemGroup>
 
 </Project>

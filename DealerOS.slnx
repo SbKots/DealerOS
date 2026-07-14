@@ -23,6 +23,9 @@
   <Folder Name="/modules/Reconditioning/">
     <Project Path="modules/Reconditioning/DealerOS.Modules.Reconditioning.csproj" />
   </Folder>
+  <Folder Name="/modules/Reservations/">
+    <Project Path="modules/Reservations/DealerOS.Modules.Reservations.csproj" />
+  </Folder>
   <Folder Name="/modules/SharedKernel/">
     <Project Path="modules/SharedKernel/DealerOS.SharedKernel.csproj" />
   </Folder>
