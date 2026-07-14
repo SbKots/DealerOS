@@ -2,7 +2,7 @@
 
 ## 1. Verdict
 
-**READY — только локальный демонстрационный MVP с синтетическими данными.** Локальные обязательные проверки 0.1–1.0 зелёные. Clean clone и GitHub Actions являются оставшимися внешними merge gates и будут заполнены одним evidence-only commit. Вердикт не разрешает реальные персональные/финансовые данные и не означает production readiness.
+**READY — только локальный демонстрационный MVP с синтетическими данными.** Локальные обязательные проверки 0.1–1.0, clean clone exact candidate и candidate GitHub Actions зелёные. Финальный merge gate — зелёный CI этого единственного evidence-only update. Вердикт не разрешает реальные персональные/финансовые данные и не означает production readiness.
 
 ## 2. Git baseline и checkpoints
 
@@ -12,10 +12,10 @@
 - 0.9: `bf5da00bd4894d0879dd0195e4176972eadb99e6` — `DealerOS 0.9: deal payments documents and vehicle handover`;
 - 1.0: `6560afbdbed9fcf6328cbf6f61f1f337fbaf6050` — `DealerOS 1.0: auditable vehicle profit and local MVP readiness`;
 - verification fix: `942150c754e7a2c1eb5e5b83d9551bf4ce96659d` — Reservation test assertions scoped to their scenario vehicle;
-- verification candidate: будет зафиксирован commit, добавляющим этот первоначальный report;
-- final evidence-only PR HEAD: pending candidate CI/clean clone.
+- verification candidate: `5fe7ac36d5c801b65690faa1aefaa72328e2eb10`;
+- final evidence-only PR HEAD: отдельный единственный child candidate, содержащий этот evidence update; authoritative value — `refs/pull/6/head` после push (SHA также фиксируется в PR checks/final handoff, поскольку commit не может содержать собственный SHA).
 
-Все checkpoints являются ancestors текущего HEAD. На момент отчёта diff к base: 68 файлов; generated EF designers входят в миграции, runtime/test artifacts не входят.
+Все checkpoints являются ancestors candidate. Candidate diff к base: 69 файлов; generated EF designers входят в миграции, runtime/test artifacts не входят.
 
 ## 3. Реализованный scope и ограничения
 
@@ -129,11 +129,37 @@ Safe `X-Correlation-ID=finance-integration-correlation-001` вернулся б�
 
 ## 13. Clean clone и evidence-only rule
 
-Pending на verification candidate. Будут зафиксированы exact candidate SHA, temp clone path/удаление, команды строго README и proof, что `candidate..final` меняет только этот report.
+Clean clone создан из GitHub в `C:\Users\SberKot\Documents\DealerOS-clean-5fe7ac3`, detached checkout подтверждён как exact `5fe7ac36d5c801b65690faa1aefaa72328e2eb10`. Строго по README выполнены:
+
+```powershell
+git clone https://github.com/SbKots/DealerOS.git C:\Users\SberKot\Documents\DealerOS-clean-5fe7ac3
+git -C C:\Users\SberKot\Documents\DealerOS-clean-5fe7ac3 checkout --detach 5fe7ac36d5c801b65690faa1aefaa72328e2eb10
+dotnet restore DealerOS.slnx
+dotnet format DealerOS.slnx --verify-no-changes --no-restore
+dotnet build DealerOS.slnx -c Release --no-restore
+dotnet test DealerOS.slnx -c Release --no-build
+cd apps/web
+npm ci
+npm run lint
+npm run test
+npm run build
+docker compose -p dealeros-clean-5fe7ac3 up --build -d
+npm run test:e2e
+docker compose -p dealeros-clean-5fe7ac3 down
+```
+
+Результат: build 0 warnings/errors; unit 62/62; integration 31/31; frontend 31/31; fresh Compose migrations 13; live/ready/web 200/200/200; Playwright 5/5. Отдельный project name исключил подключение постоянных workspace volumes. Containers/network остановлены, temp clone удалён. Созданные clean-clone volumes сохранены (не удалялись без разрешения).
+
+После этого раздела разрешён ровно один evidence-only commit. Перед push `git diff 5fe7ac36d5c801b65690faa1aefaa72328e2eb10..HEAD --name-only` должен содержать только `DEALEROS_VERIFICATION_REPORT_0.8-1.0.md`; executable tree не меняется, второй clean clone не нужен.
 
 ## 14. GitHub Actions/artifacts
 
-Pending push/PR. Workflow обязан дать backend/frontend/e2e SUCCESS. Ожидаемые artifacts: `backend-test-results`, `frontend-test-results`, `frontend-build`, `playwright-report`. Candidate и final evidence-only run будут указаны ссылками.
+Draft PR: [#6](https://github.com/SbKots/DealerOS/pull/6), candidate HEAD `5fe7ac36d5c801b65690faa1aefaa72328e2eb10`, `MERGEABLE/CLEAN`.
+
+- candidate push CI [29317877566](https://github.com/SbKots/DealerOS/actions/runs/29317877566): backend/frontend/e2e SUCCESS;
+- candidate PR CI [29317902861](https://github.com/SbKots/DealerOS/actions/runs/29317902861): backend/frontend/e2e SUCCESS;
+- artifacts run 29317902861: `backend-test-results` (387508 B), `frontend-test-results` (1960 B), `frontend-build` (131160 B), `playwright-report` (242842 B), all available/not expired;
+- final evidence-only CI: authoritative current run is available from [Actions for the branch](https://github.com/SbKots/DealerOS/actions?query=branch%3Acodex%2Frelease-train-0.8-1.0); merge выполняется только после backend/frontend/e2e SUCCESS на `refs/pull/6/head`.
 
 ## 15. Hygiene/security review
 
@@ -141,7 +167,7 @@ Pending push/PR. Workflow обязан дать backend/frontend/e2e SUCCESS. О
 
 ## 16. Однозначные ответы
 
-- Локальный MVP 1.0 завершён: **да, при зелёных pending external gates**.
+- Локальный MVP 1.0 завершён: **да; merge выполняется только после зелёного final evidence-only CI**.
 - Можно показывать сотрудникам автосалона: **да, локально и только на синтетических demo data**.
 - Можно использовать реальные данные: **нет**.
 - Production ready: **нет**.
