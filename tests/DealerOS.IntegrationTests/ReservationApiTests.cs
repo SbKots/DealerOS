@@ -50,7 +50,8 @@ public sealed class ReservationApiTests(ReconditioningPostgresFixture database)
         Assert.Equal(HttpStatusCode.OK, repeated.StatusCode);
         Assert.Equal(reservation.GetProperty("id").GetGuid(),
             (await ReadJsonAsync(repeated)).GetProperty("id").GetGuid());
-        Assert.Equal(1, await factory.QueryDbAsync(db => db.Reservations.CountAsync()));
+        Assert.Equal(1, await factory.QueryDbAsync(db => db.Reservations.CountAsync(x =>
+            x.VehicleId == first.VehicleId)));
         Assert.Equal(VehicleStatus.Reserved, await factory.QueryDbAsync(db => db.Vehicles.Where(x =>
             x.Id == first.VehicleId).Select(x => x.Status).SingleAsync()));
 
@@ -165,7 +166,8 @@ public sealed class ReservationApiTests(ReconditioningPostgresFixture database)
         using var response = await client.PostAsJsonAsync("/api/reservations",
             CreateRequest(source.SnapshotId, clock.GetUtcNow().AddDays(1)));
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal(0, await factory.QueryDbAsync(db => db.Reservations.CountAsync()));
+        Assert.Equal(0, await factory.QueryDbAsync(db => db.Reservations.CountAsync(x =>
+            x.VehicleId == source.VehicleId)));
         Assert.Equal(VehicleStatus.ReadyForSale, await factory.QueryDbAsync(db => db.Vehicles.Where(x =>
             x.Id == source.VehicleId).Select(x => x.Status).SingleAsync()));
     }
