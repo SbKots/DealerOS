@@ -774,30 +774,18 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
         {
             entity.ToTable("vehicle_media", "operations", table =>
             {
-                table.HasCheckConstraint("ck_vehicle_media_category", "\"Category\" IS NULL OR \"Category\" BETWEEN 1 AND 12");
+                table.HasCheckConstraint("ck_vehicle_media_category", "\"Category\" BETWEEN 1 AND 4");
                 table.HasCheckConstraint("ck_vehicle_media_size", "\"SizeBytes\" > 0");
-                table.HasCheckConstraint("ck_vehicle_media_dimensions", "\"Width\" > 0 AND \"Height\" > 0 AND \"ThumbnailWidth\" > 0 AND \"ThumbnailHeight\" > 0 AND \"MediumWidth\" > 0 AND \"MediumHeight\" > 0 AND \"LargeWidth\" > 0 AND \"LargeHeight\" > 0");
-                table.HasCheckConstraint("ck_vehicle_media_focal_point", "(\"FocalPointX\" IS NULL AND \"FocalPointY\" IS NULL) OR (\"FocalPointX\" BETWEEN 0 AND 1 AND \"FocalPointY\" BETWEEN 0 AND 1)");
                 table.HasCheckConstraint("ck_vehicle_media_sort", "\"SortOrder\" >= 0");
                 table.HasCheckConstraint("ck_vehicle_media_version", "\"Version\" > 0");
             });
             entity.HasKey(x => x.Id); entity.Property(x => x.Id).ValueGeneratedNever();
             entity.HasAlternateKey(x => new { x.OrganizationId, x.Id }).HasName("ak_vehicle_media_organization_id");
             entity.Property(x => x.ObjectKey).HasMaxLength(600).IsRequired();
-            entity.Property(x => x.ThumbnailObjectKey).HasMaxLength(600).IsRequired();
-            entity.Property(x => x.MediumObjectKey).HasMaxLength(600).IsRequired();
-            entity.Property(x => x.LargeObjectKey).HasMaxLength(600).IsRequired();
             entity.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
             entity.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
-            entity.Property(x => x.Caption).HasMaxLength(500);
-            entity.Property(x => x.FocalPointX).HasPrecision(5, 4);
-            entity.Property(x => x.FocalPointY).HasPrecision(5, 4);
             entity.Property(x => x.Version).IsConcurrencyToken();
-            entity.HasIndex(x => new { x.OrganizationId, x.ObjectKey })
-                .HasDatabaseName("ix_vehicle_media_original_object_key");
-            entity.HasIndex(x => new { x.OrganizationId, x.VehicleId, x.SourceInspectionPhotoId }).IsUnique()
-                .HasFilter("\"SourceInspectionPhotoId\" IS NOT NULL")
-                .HasDatabaseName("ux_vehicle_media_inspection_source");
+            entity.HasIndex(x => x.ObjectKey).IsUnique().HasDatabaseName("ux_vehicle_media_object_key");
             entity.HasIndex(x => new { x.OrganizationId, x.VehicleId }).IsUnique().HasFilter("\"IsCover\"")
                 .HasDatabaseName("ux_vehicle_media_cover");
             entity.HasIndex(x => new { x.OrganizationId, x.VehicleId, x.SortOrder });
@@ -807,10 +795,6 @@ public sealed class DealerOsDbContext(DbContextOptions<DealerOsDbContext> option
                 .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<UserAccount>().WithMany().HasForeignKey(x => new { x.OrganizationId, x.CreatedByUserId })
                 .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<InspectionPhoto>().WithMany()
-                .HasForeignKey(x => new { x.OrganizationId, Id = x.SourceInspectionPhotoId })
-                .HasPrincipalKey(x => new { x.OrganizationId, x.Id }).OnDelete(DeleteBehavior.Restrict)
-                .IsRequired(false);
         });
 
         modelBuilder.Entity<ListingContent>(entity =>

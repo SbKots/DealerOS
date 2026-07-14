@@ -39,15 +39,7 @@ public sealed record InspectionTemplateResponse(Guid Id, string Name, int Versio
 public sealed record InspectionTemplateItemResponse(Guid Id, string Key, string Category, string Label,
     string? Description, bool IsRequired, int SortOrder);
 public sealed record InspectionPhotoDownload(Stream Content, string ContentType, string FileName, long SizeBytes);
-public sealed record NormalizedInspectionImage(Stream Content, string ContentType, string Extension, long SizeBytes,
-    int Width, int Height);
-public sealed record ProcessedImageVariant(byte[] Content, string ContentType, string Extension, int Width,
-    int Height)
-{
-    public long SizeBytes => Content.LongLength;
-}
-public sealed record ProcessedVehicleImageSet(ProcessedImageVariant Original, ProcessedImageVariant Thumbnail,
-    ProcessedImageVariant Medium, ProcessedImageVariant Large);
+public sealed record NormalizedInspectionImage(Stream Content, string ContentType, string Extension, long SizeBytes);
 public sealed record InspectionPhotoRegistration(Guid InspectionId, Guid DefectId);
 
 public interface IInspectionStore
@@ -91,6 +83,4 @@ public interface IInspectionImageProcessor
 {
     Task<NormalizedInspectionImage> NormalizeAsync(Stream input, long declaredLength, string originalFileName,
         string? declaredContentType, CancellationToken cancellationToken);
-    Task<ProcessedVehicleImageSet> CreateVehicleGallerySetAsync(Stream input, long declaredLength,
-        string originalFileName, string? declaredContentType, CancellationToken cancellationToken);
 }

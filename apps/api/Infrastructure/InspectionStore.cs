@@ -108,9 +108,6 @@ public sealed class InspectionStore(DealerOsDbContext dbContext, ILogger<Inspect
             if (await dbContext.InspectionPhotos.AsNoTracking().AnyAsync(x => x.OrganizationId == organizationId
                     && x.ObjectKey == objectKey && x.DefectId != removedDefectId, cancellationToken))
                 continue;
-            if (await dbContext.VehicleMedia.AsNoTracking().AnyAsync(x => x.OrganizationId == organizationId
-                    && x.ObjectKey == objectKey, cancellationToken))
-                continue;
             if (!await dbContext.InspectionObjectDeletions.AnyAsync(x => x.OrganizationId == organizationId
                     && x.ObjectKey == objectKey, cancellationToken))
                 dbContext.InspectionObjectDeletions.Add(new InspectionObjectDeletion(organizationId, objectKey, now));

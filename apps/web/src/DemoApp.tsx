@@ -5,14 +5,6 @@ import './App.css'
 type DemoView = 'dashboard' | 'vehicles' | 'vehicle' | 'inspections' | 'reconditioning' | 'crm' | 'sales' | 'reservations' | 'deals' | 'finance'
 type DemoNavItem = { view: Exclude<DemoView, 'vehicle'>; label: string; icon: IconName }
 type DemoVehicle = { id: string; make: string; model: string; year: number; mileage: number; vin: string; stock: string; status: string; tone: 'success' | 'warning' | 'info'; price: number }
-type DemoPhoto = { id: string; url: string; category: string; caption: string; isCover: boolean }
-
-const demoAsset = (name: string) => `${import.meta.env.BASE_URL}demo/gallery/${name}`
-const initialDemoPhotos: DemoPhoto[] = [
-  { id: 'demo-photo-front', url: demoAsset('silver-sedan-front.webp'), category: 'Основной вид', caption: 'Передний ракурс · демо-фото', isCover: true },
-  { id: 'demo-photo-rear', url: demoAsset('silver-sedan-rear.webp'), category: 'Сзади', caption: 'Задний ракурс · демо-фото', isCover: false },
-  { id: 'demo-photo-interior', url: demoAsset('silver-sedan-interior.webp'), category: 'Салон', caption: 'Интерьер · демо-фото', isCover: false },
-]
 
 const demoVehicles: DemoVehicle[] = [
   { id: 'demo-vesta', make: 'Lada', model: 'Vesta', year: 2023, mileage: 18_400, vin: 'DEMO0000000000001', stock: 'MSK-0241', status: 'Готов к продаже', tone: 'success', price: 1_420_000 },
@@ -47,7 +39,6 @@ export default function DemoApp() {
   const [sidebarCompact, setSidebarCompact] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [completedWorks, setCompletedWorks] = useState<string[]>(['Диагностика ходовой'])
-  const [demoPhotos, setDemoPhotos] = useState(initialDemoPhotos)
 
   if (!entered) return <DemoLogin onEnter={() => setEntered(true)} />
 
@@ -79,8 +70,8 @@ export default function DemoApp() {
       <div className="demo-mode-banner" role="status"><Icon name="alert" size={16} /><span><strong>Демонстрационный режим</strong> · синтетические данные · изменения хранятся только до обновления страницы</span></div>
       <main className="workspace demo-workspace">
         {view === 'dashboard' && <DemoDashboard onNavigate={navigate} onOpenVehicle={() => openVehicle(demoVehicles[1])} />}
-        {view === 'vehicles' && <DemoVehicles onOpen={openVehicle} coverUrl={demoPhotos.find((photo) => photo.isCover)?.url} />}
-        {view === 'vehicle' && <DemoVehicleCard vehicle={selectedVehicle} photos={demoPhotos} onPhotosChange={setDemoPhotos} onBack={() => navigate('vehicles')} />}
+        {view === 'vehicles' && <DemoVehicles onOpen={openVehicle} />}
+        {view === 'vehicle' && <DemoVehicleCard vehicle={selectedVehicle} onBack={() => navigate('vehicles')} />}
         {view === 'inspections' && <DemoInspections />}
         {view === 'reconditioning' && <DemoReconditioning completed={completedWorks} onToggle={toggleWork} />}
         {view === 'crm' && <DemoCrm />}
@@ -124,32 +115,13 @@ function DemoMetric({ icon, label, value, tone = '' }: { icon: IconName; label: 
   return <article className={`dashboard-metric ${tone}`}><span className="metric-icon"><Icon name={icon} size={20} /></span><span><small>{label}</small><strong>{value}</strong><em>синтетический показатель</em></span><Icon name="chevron" size={16} /></article>
 }
 
-function DemoVehicles({ onOpen, coverUrl }: { onOpen: (vehicle: DemoVehicle) => void; coverUrl?: string }) {
+function DemoVehicles({ onOpen }: { onOpen: (vehicle: DemoVehicle) => void }) {
   return <><PageHeader eyebrow="Автомобили" title="Реестр автомобилей" description="Демонстрационный автопарк и текущий этап каждого автомобиля." />
-    <section className="registry"><div className="registry-heading"><div><p className="eyebrow">Демо-площадка</p><h2>24 автомобиля</h2><p className="muted">Показаны три синтетические карточки</p></div></div><div className="table-wrap"><table><thead><tr><th>Автомобиль</th><th>VIN</th><th>Складской номер</th><th className="numeric">Цена</th><th>Статус</th><th /></tr></thead><tbody>{demoVehicles.map((vehicle) => <tr key={vehicle.id} onClick={() => onOpen(vehicle)}><td><div className="registry-vehicle-cell">{coverUrl ? <img className="vehicle-cover compact" src={coverUrl} alt="Синтетическое фото автомобиля" /> : <VehicleVisual name={`${vehicle.make} ${vehicle.model}`} />}<span><strong>{vehicle.make} {vehicle.model}</strong><small>{vehicle.year} · {vehicle.mileage.toLocaleString('ru-RU')} км</small></span></div></td><td className="mono">{vehicle.vin}</td><td>{vehicle.stock}</td><td className="numeric"><Money value={vehicle.price} /></td><td><DemoStatus vehicle={vehicle} /></td><td><button className="table-row-action" aria-label={`Открыть ${vehicle.make} ${vehicle.model}`} onClick={() => onOpen(vehicle)}><Icon name="chevron" size={16} /></button></td></tr>)}</tbody></table></div></section></>
+    <section className="registry"><div className="registry-heading"><div><p className="eyebrow">Демо-площадка</p><h2>24 автомобиля</h2><p className="muted">Показаны три синтетические карточки</p></div></div><div className="table-wrap"><table><thead><tr><th>Автомобиль</th><th>VIN</th><th>Складской номер</th><th className="numeric">Цена</th><th>Статус</th><th /></tr></thead><tbody>{demoVehicles.map((vehicle) => <tr key={vehicle.id} onClick={() => onOpen(vehicle)}><td><strong>{vehicle.make} {vehicle.model}</strong><small>{vehicle.year} · {vehicle.mileage.toLocaleString('ru-RU')} км</small></td><td className="mono">{vehicle.vin}</td><td>{vehicle.stock}</td><td className="numeric"><Money value={vehicle.price} /></td><td><DemoStatus vehicle={vehicle} /></td><td><button className="table-row-action" aria-label={`Открыть ${vehicle.make} ${vehicle.model}`} onClick={() => onOpen(vehicle)}><Icon name="chevron" size={16} /></button></td></tr>)}</tbody></table></div></section></>
 }
 
-function DemoVehicleCard({ vehicle, photos, onPhotosChange, onBack }: { vehicle: DemoVehicle; photos: DemoPhoto[]; onPhotosChange: (photos: DemoPhoto[]) => void; onBack: () => void }) {
-  const cover = photos.find((photo) => photo.isCover)
-  return <><PageHeader eyebrow="Карточка автомобиля" title={`${vehicle.make} ${vehicle.model}`} description={`${vehicle.year} · ${vehicle.stock} · синтетические данные`}><button className="secondary" onClick={onBack}>← К реестру</button></PageHeader><div className="demo-detail-grid"><section className="panel"><VehicleVisual name={`${vehicle.make} ${vehicle.model}`} imageUrl={cover?.url} /><div className="vehicle-card-top"><DemoStatus vehicle={vehicle} /><span className="stock-number">{vehicle.stock}</span></div><div className="vehicle-identity"><h3>{vehicle.make} {vehicle.model}</h3><p>{vehicle.year} · {vehicle.mileage.toLocaleString('ru-RU')} км</p><code>{vehicle.vin}</code></div><dl className="demo-data-list"><div><dt>Плановая цена</dt><dd><Money value={vehicle.price} /></dd></div><div><dt>Площадка</dt><dd>Москва — демо</dd></div><div><dt>Осмотр</dt><dd>14 июля 2026</dd></div><div><dt>Ответственный</dt><dd>Демо-менеджер</dd></div></dl></section><section className="panel"><p className="eyebrow">Путь автомобиля</p><h2>История и следующий шаг</h2><VehicleJourney status={vehicle.tone === 'warning' ? 'ReconditioningRequired' : vehicle.tone === 'info' ? 'InspectionInProgress' : 'ReadyForSale'} /><div className="timeline"><article><span>14:10</span><strong>Карточка обновлена</strong><p>Изменение сохранено в демонстрационном журнале.</p></article><article><span>12:40</span><strong>Осмотр завершён</strong><p>Результаты доступны сотрудникам площадки.</p></article><article><span>10:15</span><strong>Принят на склад</strong><p>Назначен складской номер {vehicle.stock}.</p></article></div></section></div><section className="panel vehicle-gallery-panel"><DemoVehicleGallery photos={photos} onChange={onPhotosChange} /></section></>
-}
-
-function DemoVehicleGallery({ photos, onChange }: { photos: DemoPhoto[]; onChange: (photos: DemoPhoto[]) => void }) {
-  const [lightboxId, setLightboxId] = useState<string>()
-  const current = photos.find((photo) => photo.id === lightboxId)
-  const setCover = (id: string) => onChange(photos.map((photo) => ({ ...photo, isCover: photo.id === id })))
-  const move = (id: string, offset: number) => {
-    const from = photos.findIndex((photo) => photo.id === id)
-    const to = Math.max(0, Math.min(photos.length - 1, from + offset))
-    if (from === to) return
-    const next = [...photos]; next.splice(to, 0, next.splice(from, 1)[0]); onChange(next)
-  }
-  const step = (offset: number) => {
-    if (!lightboxId || !photos.length) return
-    const index = photos.findIndex((photo) => photo.id === lightboxId)
-    setLightboxId(photos[(index + offset + photos.length) % photos.length].id)
-  }
-  return <div className="vehicle-gallery demo-gallery"><div className="gallery-heading"><div><span className="overline">Медиа автомобиля</span><h3>Фотогалерея</h3><p>Синтетические изображения · действия сохраняются только в памяти вкладки</p></div><span className="demo-badge">Демонстрационный режим</span></div>{photos.length ? <div className="vehicle-photo-grid">{photos.map((photo, index) => <article key={photo.id} className={photo.isCover ? 'cover' : ''}><button className="photo-open" onClick={() => setLightboxId(photo.id)} aria-label={`Открыть ${photo.caption}`}><img src={photo.url} alt={photo.caption} />{photo.isCover && <span className="photo-badges"><b>Обложка</b></span>}</button><div className="photo-card-copy"><strong>{photo.category}</strong><small>{photo.caption}</small><em>Синтетический контент</em></div><div className="photo-actions"><button disabled={index === 0} onClick={() => move(photo.id, -1)}>←</button><button disabled={index === photos.length - 1} onClick={() => move(photo.id, 1)}>→</button>{!photo.isCover && <button onClick={() => setCover(photo.id)}>Обложка</button>}<button className="danger" onClick={() => onChange(photos.filter((item) => item.id !== photo.id))}>Удалить</button></div></article>)}</div> : <div className="empty-state"><strong>Демо-галерея пуста</strong><p>Обновите страницу, чтобы восстановить синтетические фотографии.</p></div>}{current && <div className="gallery-lightbox" role="dialog" aria-modal="true" aria-label={current.caption} onMouseDown={(event) => { if (event.target === event.currentTarget) setLightboxId(undefined) }}><button className="lightbox-close" aria-label="Закрыть" onClick={() => setLightboxId(undefined)}>×</button>{photos.length > 1 && <button className="lightbox-prev" aria-label="Предыдущее фото" onClick={() => step(-1)}>‹</button>}<div className="lightbox-content"><img src={current.url} alt={current.caption} style={{ objectFit: 'contain' }} /><span><strong>{current.category}</strong><small>{current.caption}</small></span></div>{photos.length > 1 && <button className="lightbox-next" aria-label="Следующее фото" onClick={() => step(1)}>›</button>}</div>}</div>
+function DemoVehicleCard({ vehicle, onBack }: { vehicle: DemoVehicle; onBack: () => void }) {
+  return <><PageHeader eyebrow="Карточка автомобиля" title={`${vehicle.make} ${vehicle.model}`} description={`${vehicle.year} · ${vehicle.stock} · синтетические данные`}><button className="secondary" onClick={onBack}>← К реестру</button></PageHeader><div className="demo-detail-grid"><section className="panel"><VehicleVisual name={`${vehicle.make} ${vehicle.model}`} /><div className="vehicle-card-top"><DemoStatus vehicle={vehicle} /><span className="stock-number">{vehicle.stock}</span></div><div className="vehicle-identity"><h3>{vehicle.make} {vehicle.model}</h3><p>{vehicle.year} · {vehicle.mileage.toLocaleString('ru-RU')} км</p><code>{vehicle.vin}</code></div><dl className="demo-data-list"><div><dt>Плановая цена</dt><dd><Money value={vehicle.price} /></dd></div><div><dt>Площадка</dt><dd>Москва — демо</dd></div><div><dt>Осмотр</dt><dd>14 июля 2026</dd></div><div><dt>Ответственный</dt><dd>Демо-менеджер</dd></div></dl></section><section className="panel"><p className="eyebrow">Путь автомобиля</p><h2>История и следующий шаг</h2><VehicleJourney status={vehicle.tone === 'warning' ? 'ReconditioningRequired' : vehicle.tone === 'info' ? 'InspectionInProgress' : 'ReadyForSale'} /><div className="timeline"><article><span>14:10</span><strong>Карточка обновлена</strong><p>Изменение сохранено в демонстрационном журнале.</p></article><article><span>12:40</span><strong>Осмотр завершён</strong><p>Результаты доступны сотрудникам площадки.</p></article><article><span>10:15</span><strong>Принят на склад</strong><p>Назначен складской номер {vehicle.stock}.</p></article></div></section></div></>
 }
 
 function DemoStatus({ vehicle }: { vehicle: DemoVehicle }) { return <span className={`status ${vehicle.tone}`}><i />{vehicle.status}</span> }

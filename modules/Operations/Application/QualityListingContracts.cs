@@ -3,8 +3,6 @@ using DealerOS.Modules.Vehicles.Domain;
 
 namespace DealerOS.Modules.Operations.Application;
 
-public enum VehicleMediaVariant { Thumbnail, Medium, Large, Original }
-
 public sealed record AddQualityObservationRequest(Guid ObservationId, QualityObservationSeverity Severity,
     Guid? WorkOrderId, Guid? DefectId, string? Comment, bool RequiresRework, long ExpectedVersion);
 public sealed record QualityDecisionRequest(string? Comment, long ExpectedVersion);
@@ -19,24 +17,12 @@ public sealed record QualityQueueResponse(Guid ExecutionId, Guid VehicleId, stri
     string? LatestQualityStatus, int? LatestQualityRevision,
     IReadOnlyList<QualityQueueWorkOrderResponse> WorkOrders);
 
-public sealed record VehicleMediaResponse(Guid Id, Guid VehicleId, string? Category, string OriginalFileName,
-    string ContentType, long SizeBytes, int Width, int Height, int SortOrder, bool IsCover,
-    bool IsIncludedInListing, string? Caption, decimal? FocalPointX, decimal? FocalPointY,
-    Guid? SourceInspectionPhotoId, long Version, string ThumbnailUrl, string MediumUrl, string LargeUrl,
-    string OriginalUrl, string DownloadUrl, DateTimeOffset CreatedAt);
+public sealed record VehicleMediaResponse(Guid Id, Guid VehicleId, string Category, string OriginalFileName,
+    string ContentType, long SizeBytes, int SortOrder, bool IsCover, long Version, string DownloadUrl,
+    DateTimeOffset CreatedAt);
 public sealed record VehicleMediaDownload(Stream Content, string ContentType, string FileName);
 public sealed record UpdateMediaOrderRequest(int SortOrder, long ExpectedVersion);
 public sealed record SetMediaCoverRequest(long ExpectedVersion);
-public sealed record UpdateMediaMetadataRequest(VehicleMediaCategory? Category, string? Caption,
-    decimal? FocalPointX, decimal? FocalPointY, long ExpectedVersion);
-public sealed record SetMediaListingSelectionRequest(bool IsIncluded, long ExpectedVersion);
-public sealed record DeleteMediaRequest(long ExpectedVersion);
-public sealed record ReorderMediaItemRequest(Guid MediaId, int SortOrder, long ExpectedVersion);
-public sealed record ReorderVehicleMediaRequest(IReadOnlyList<ReorderMediaItemRequest> Items);
-public sealed record ImportInspectionPhotoRequest(Guid MediaId, Guid InspectionPhotoId,
-    VehicleMediaCategory? Category);
-public sealed record InspectionMediaSourceResponse(Guid PhotoId, Guid InspectionId, Guid DefectId,
-    string DefectTitle, string OriginalFileName, DateTimeOffset CreatedAt, string PreviewUrl);
 public sealed record UpdateListingContentRequest(Guid CommandId, string? Equipment, string? Advantages,
     string? ConditionDescription, decimal PublicPriceAmount, string? Currency, string? TemplateName,
     int TemplateVersion, long ExpectedVersion);
@@ -57,9 +43,6 @@ public sealed record ListingExportResponse(string FileName, string ContentType, 
     ListingContentResponse Listing);
 
 public sealed record MediaRegistration(Guid OrganizationId, Guid VehicleId, VehicleMedia Media);
-public sealed record InspectionMediaSource(Guid PhotoId, Guid InspectionId, Guid DefectId, Guid VehicleId,
-    Guid BranchId, string DefectTitle, string OriginalFileName, string ObjectKey, string ContentType,
-    long SizeBytes, DateTimeOffset CreatedAt);
 
 public interface IQualityListingStore
 {
@@ -79,17 +62,9 @@ public interface IQualityListingStore
     Task<VehicleMedia?> FindMediaAsync(Guid organizationId, Guid mediaId, CancellationToken cancellationToken);
     Task<IReadOnlyList<VehicleMedia>> ListMediaAsync(Guid organizationId, Guid vehicleId,
         CancellationToken cancellationToken);
-    Task<int> CountMediaAsync(Guid organizationId, Guid vehicleId, CancellationToken cancellationToken);
-    Task<InspectionMediaSource?> FindInspectionMediaSourceAsync(Guid organizationId, Guid vehicleId,
-        Guid inspectionPhotoId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<InspectionMediaSourceResponse>> ListInspectionMediaSourcesAsync(Guid organizationId,
-        Guid vehicleId, IReadOnlySet<Guid> branchIds, CancellationToken cancellationToken);
     Task AddMediaAsync(VehicleMedia media, CancellationToken cancellationToken);
-    void RemoveMedia(VehicleMedia media);
     Task QueueObjectDeletionAsync(Guid organizationId, string objectKey, DateTimeOffset now,
         CancellationToken cancellationToken);
-    Task CompleteObjectDeletionAsync(Guid organizationId, string objectKey, CancellationToken cancellationToken);
-    Task<bool> HasImmutableListingAsync(Guid organizationId, Guid vehicleId, CancellationToken cancellationToken);
     Task<ListingContent?> FindListingAsync(Guid organizationId, Guid listingId, CancellationToken cancellationToken);
     Task<ListingContent?> FindLatestListingAsync(Guid organizationId, Guid vehicleId,
         CancellationToken cancellationToken);

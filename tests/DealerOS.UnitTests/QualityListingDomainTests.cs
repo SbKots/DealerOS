@@ -52,37 +52,6 @@ public sealed class QualityListingDomainTests
     }
 
     [Fact]
-    public void GalleryMetadata_ValidatesFocalPointAndKeepsSharedOriginalOutOfDeletionSet()
-    {
-        var sourcePhotoId = Guid.NewGuid();
-        var media = new VehicleMedia(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            VehicleMediaCategory.Defect, "inspection/shared.jpg", "gallery/thumb.jpg", "gallery/medium.jpg",
-            "gallery/large.jpg", "evidence.jpg", "image/jpeg", 100, 1600, 900, 480, 270, 1280, 720,
-            1600, 900, sourcePhotoId, false, 10, Guid.NewGuid(), Now);
-
-        media.UpdateMetadata(VehicleMediaCategory.Defect, "  Скол на капоте  ", 0.25m, 0.75m, 1);
-
-        Assert.Equal("Скол на капоте", media.Caption);
-        Assert.Equal(0.25m, media.FocalPointX);
-        Assert.Equal(sourcePhotoId, media.SourceInspectionPhotoId);
-        Assert.DoesNotContain("inspection/shared.jpg", media.OwnedObjectKeys());
-        Assert.Equal(3, media.OwnedObjectKeys().Count);
-        Assert.Throws<DomainException>(() => media.UpdateMetadata(null, null, 1.1m, 0.5m, media.Version));
-    }
-
-    [Fact]
-    public void Document_CannotBeSelectedForListing()
-    {
-        var media = new VehicleMedia(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            VehicleMediaCategory.Documents, "private/key.jpg", "document.jpg", "image/jpeg", 100,
-            10, Guid.NewGuid(), Now);
-
-        Assert.False(media.IsIncludedInListing);
-        var error = Assert.Throws<DomainException>(() => media.SetIncludedInListing(true, 1));
-        Assert.Equal("media.internal_listing", error.Code);
-    }
-
-    [Fact]
     public void ListingSnapshot_IsImmutableAndPublicationRequiresExplicitExport()
     {
         var listing = ListingContent.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, "Lada", "Vesta",

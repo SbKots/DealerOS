@@ -6,7 +6,7 @@ public sealed record ActorContext(Guid UserId, Guid OrganizationId, IReadOnlySet
 public sealed record CreateVehicleRequest(Guid BranchId, string? Vin, string? Make, string? Model, int Year, int MileageKm, decimal PlannedPurchaseAmount, string? Currency);
 public sealed record VehicleResponse(Guid Id, Guid BranchId, string BranchName, string Vin, string Make, string Model,
     int Year, int MileageKm, decimal PlannedPurchaseAmount, string Currency, string Status, string? StockNumber,
-    DateTimeOffset CreatedAt, DateTimeOffset? AcceptedAt, long Version, Guid? CoverPhotoId);
+    DateTimeOffset CreatedAt, DateTimeOffset? AcceptedAt, long Version);
 
 public interface IVehicleStore
 {

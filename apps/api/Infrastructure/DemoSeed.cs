@@ -59,8 +59,7 @@ public static class DemoSeed
             AddUser(db, hasher, VolgaManagerUserId, VolgaOrganizationId, VolgaBranchId,
                 "manager@volga-auto.demo", "Марина Руководитель",
                 [Permissions.VehiclesRead, .. Permissions.ReconditioningManager, .. Permissions.OperationsManager,
-                    .. Permissions.QualityManager, Permissions.ListingsView, Permissions.VehiclesPhotosView,
-                    .. Permissions.CrmManager]);
+                    .. Permissions.QualityManager, Permissions.ListingsView, .. Permissions.CrmManager]);
         await db.SaveChangesAsync(cancellationToken);
 
         await EnsurePermissionsAsync(db, VolgaAdminUserId, Permissions.VehicleOperator, cancellationToken);
@@ -72,8 +71,7 @@ public static class DemoSeed
             cancellationToken);
         await EnsurePermissionsAsync(db, VolgaManagerUserId,
             [Permissions.VehiclesRead, .. Permissions.ReconditioningManager, .. Permissions.OperationsManager,
-                .. Permissions.QualityManager, Permissions.ListingsView, Permissions.VehiclesPhotosView,
-                .. Permissions.CrmManager],
+                .. Permissions.QualityManager, Permissions.ListingsView, .. Permissions.CrmManager],
             cancellationToken);
 
         if (!await db.InspectionTemplates.AnyAsync(x => x.Id == VolgaTemplateId, cancellationToken))

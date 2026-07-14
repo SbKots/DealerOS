@@ -2142,11 +2142,7 @@ namespace DealerOS.Api.Infrastructure.Migrations
                     b.Property<Guid>("BranchId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Caption")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<int?>("Category")
+                    b.Property<int>("Category")
                         .HasColumnType("integer");
 
                     b.Property<string>("ContentType")
@@ -2160,44 +2156,8 @@ namespace DealerOS.Api.Infrastructure.Migrations
                     b.Property<Guid>("CreatedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<decimal?>("FocalPointX")
-                        .HasPrecision(5, 4)
-                        .HasColumnType("numeric(5,4)");
-
-                    b.Property<decimal?>("FocalPointY")
-                        .HasPrecision(5, 4)
-                        .HasColumnType("numeric(5,4)");
-
-                    b.Property<int>("Height")
-                        .HasColumnType("integer");
-
                     b.Property<bool>("IsCover")
                         .HasColumnType("boolean");
-
-                    b.Property<bool>("IsIncludedInListing")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("LargeHeight")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("LargeObjectKey")
-                        .IsRequired()
-                        .HasMaxLength(600)
-                        .HasColumnType("character varying(600)");
-
-                    b.Property<int>("LargeWidth")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("MediumHeight")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("MediumObjectKey")
-                        .IsRequired()
-                        .HasMaxLength(600)
-                        .HasColumnType("character varying(600)");
-
-                    b.Property<int>("MediumWidth")
-                        .HasColumnType("integer");
 
                     b.Property<string>("ObjectKey")
                         .IsRequired()
@@ -2212,27 +2172,10 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
-                    b.Property<bool>("OwnsOriginalObject")
-                        .HasColumnType("boolean");
-
                     b.Property<long>("SizeBytes")
                         .HasColumnType("bigint");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("SourceInspectionPhotoId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ThumbnailHeight")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ThumbnailObjectKey")
-                        .IsRequired()
-                        .HasMaxLength(600)
-                        .HasColumnType("character varying(600)");
-
-                    b.Property<int>("ThumbnailWidth")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("VehicleId")
@@ -2242,22 +2185,18 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
-                    b.Property<int>("Width")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
                     b.HasAlternateKey("OrganizationId", "Id")
                         .HasName("ak_vehicle_media_organization_id");
 
+                    b.HasIndex("ObjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_vehicle_media_object_key");
+
                     b.HasIndex("OrganizationId", "BranchId");
 
                     b.HasIndex("OrganizationId", "CreatedByUserId");
-
-                    b.HasIndex("OrganizationId", "ObjectKey")
-                        .HasDatabaseName("ix_vehicle_media_original_object_key");
-
-                    b.HasIndex("OrganizationId", "SourceInspectionPhotoId");
 
                     b.HasIndex("OrganizationId", "VehicleId")
                         .IsUnique()
@@ -2266,18 +2205,9 @@ namespace DealerOS.Api.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId", "VehicleId", "SortOrder");
 
-                    b.HasIndex("OrganizationId", "VehicleId", "SourceInspectionPhotoId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_vehicle_media_inspection_source")
-                        .HasFilter("\"SourceInspectionPhotoId\" IS NOT NULL");
-
                     b.ToTable("vehicle_media", "operations", t =>
                         {
-                            t.HasCheckConstraint("ck_vehicle_media_category", "\"Category\" IS NULL OR \"Category\" BETWEEN 1 AND 12");
-
-                            t.HasCheckConstraint("ck_vehicle_media_dimensions", "\"Width\" > 0 AND \"Height\" > 0 AND \"ThumbnailWidth\" > 0 AND \"ThumbnailHeight\" > 0 AND \"MediumWidth\" > 0 AND \"MediumHeight\" > 0 AND \"LargeWidth\" > 0 AND \"LargeHeight\" > 0");
-
-                            t.HasCheckConstraint("ck_vehicle_media_focal_point", "(\"FocalPointX\" IS NULL AND \"FocalPointY\" IS NULL) OR (\"FocalPointX\" BETWEEN 0 AND 1 AND \"FocalPointY\" BETWEEN 0 AND 1)");
+                            t.HasCheckConstraint("ck_vehicle_media_category", "\"Category\" BETWEEN 1 AND 4");
 
                             t.HasCheckConstraint("ck_vehicle_media_size", "\"SizeBytes\" > 0");
 
@@ -4254,12 +4184,6 @@ namespace DealerOS.Api.Infrastructure.Migrations
                         .HasPrincipalKey("OrganizationId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("DealerOS.Modules.Inspections.Domain.InspectionPhoto", null)
-                        .WithMany()
-                        .HasForeignKey("OrganizationId", "SourceInspectionPhotoId")
-                        .HasPrincipalKey("OrganizationId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("DealerOS.Modules.Vehicles.Domain.Vehicle", null)
                         .WithMany()

@@ -63,9 +63,7 @@ public sealed class VehicleStore(DealerOsDbContext dbContext) : IVehicleStore, I
         orderby vehicle.CreatedAt descending
         select new VehicleResponse(vehicle.Id, vehicle.BranchId, branch.Name, vehicle.Vin, vehicle.Make, vehicle.Model,
             vehicle.Year, vehicle.MileageKm, vehicle.PlannedPurchaseAmount, vehicle.Currency, vehicle.Status.ToString(),
-            vehicle.StockNumber, vehicle.CreatedAt, vehicle.AcceptedAt, vehicle.Version,
-            dbContext.VehicleMedia.Where(media => media.OrganizationId == organizationId
-                && media.VehicleId == vehicle.Id && media.IsCover).Select(media => (Guid?)media.Id).SingleOrDefault());
+            vehicle.StockNumber, vehicle.CreatedAt, vehicle.AcceptedAt, vehicle.Version);
 
     private static bool IsPostgresConcurrencyConflict(Exception exception)
     {
