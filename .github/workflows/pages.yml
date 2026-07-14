@@ -2,7 +2,7 @@ name: Deploy visual demo to GitHub Pages
 
 on:
   push:
-    branches: [master, codex/ux-ui-redesign-1.0]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
